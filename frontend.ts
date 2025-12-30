@@ -104,6 +104,26 @@ function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function debounce<Args extends unknown[]>(fn: (...args: Args) => void, ms: number): (...args: Args) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  return (...args: Args) => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), ms);
+  };
+}
+
+function updateSearchQueryParam(query: string): void {
+  const url = new URL(window.location.href);
+  if (query) {
+    url.searchParams.set("q", query);
+  } else {
+    url.searchParams.delete("q");
+  }
+  history.replaceState(null, "", url.toString());
+}
+
+const debouncedUpdateSearchQueryParam = debounce(updateSearchQueryParam, 500);
+
 function formatDate(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
@@ -288,10 +308,12 @@ function getProjectTriggerText(projects: string[]): string {
     return "All projects";
   }
   const selected = projects.filter(p => selectedProjects.has(p));
+  const first = selected[0];
+  if (!first) return "All projects";
   if (selected.length === 1) {
-    return selected[0];
+    return first;
   }
-  return `${selected[0]} <span class="badge">+${selected.length - 1}</span>`;
+  return `${first} <span class="badge">+${selected.length - 1}</span>`;
 }
 
 function updateTableAndStats(): void {
@@ -351,13 +373,6 @@ function render(): void {
               Plans
             </h1>
             <div class="header-spacer"></div>
-            <div class="search-wrapper">
-              <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input type="search" class="search-input" id="search" placeholder="Search..." value="${escapeHtml(searchQuery)}" autofocus>
-              <span class="search-kbd">⌘K</span>
-            </div>
             <select class="sort-select" id="sort">
               <option value="modified-desc" ${sortKey === "modified" && sortDir === "desc" ? "selected" : ""}>Modified (newest)</option>
               <option value="modified-asc" ${sortKey === "modified" && sortDir === "asc" ? "selected" : ""}>Modified (oldest)</option>
@@ -372,6 +387,13 @@ function render(): void {
               <option value="created-desc" ${sortKey === "created" && sortDir === "desc" ? "selected" : ""}>Created (newest)</option>
               <option value="created-asc" ${sortKey === "created" && sortDir === "asc" ? "selected" : ""}>Created (oldest)</option>
             </select>
+            <div class="search-wrapper">
+              <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input type="search" class="search-input" id="search" placeholder="Search..." value="${escapeHtml(searchQuery)}" autofocus>
+              <span class="search-kbd">⌘K</span>
+            </div>
             ${projects.length > 0 ? `
             <div class="project-dropdown">
               <button class="dropdown-trigger ${selectedProjects.size > 0 ? 'has-selection' : ''}" id="project-trigger" popovertarget="project-menu">
@@ -523,6 +545,7 @@ function attachEventListeners(): void {
   searchInput?.addEventListener("input", (e) => {
     searchQuery = (e.target as HTMLInputElement).value;
     applyFilters();
+    debouncedUpdateSearchQueryParam(searchQuery);
     // Restore focus and cursor position after render
     const newInput = document.getElementById("search") as HTMLInputElement;
     newInput?.focus();
@@ -568,7 +591,9 @@ function attachEventListeners(): void {
   });
 
   sortSelect?.addEventListener("change", (e) => {
-    const [key, dir] = (e.target as HTMLSelectElement).value.split("-");
+    const parts = (e.target as HTMLSelectElement).value.split("-");
+    const key = parts[0] ?? "modified";
+    const dir = parts[1] ?? "desc";
     sortKey = key;
     sortDir = dir as "asc" | "desc";
     sortPlans();
@@ -711,10 +736,11 @@ document.addEventListener("keydown", (e) => {
     let newIdx = e.key === "ArrowDown" ? idx + 1 : idx - 1;
     if (newIdx < 0) newIdx = 0;
     if (newIdx >= filteredPlans.length) newIdx = filteredPlans.length - 1;
-    if (filteredPlans[newIdx]) {
-      selectPlan(filteredPlans[newIdx]);
+    const plan = filteredPlans[newIdx];
+    if (plan) {
+      selectPlan(plan);
       document
-        .querySelector(`tr[data-filename="${filteredPlans[newIdx].filename}"]`)
+        .querySelector(`tr[data-filename="${plan.filename}"]`)
         ?.scrollIntoView({ block: "nearest" });
     }
   }
@@ -739,6 +765,7 @@ document.addEventListener("keydown", (e) => {
           // Clear search first
           searchQuery = "";
           searchInput.value = "";
+          updateSearchQueryParam("");
           applyFilters();
         } else {
           // Already empty, blur
@@ -784,8 +811,16 @@ async function init(): Promise<void> {
     plans = await res.json();
     filteredPlans = [...plans];
 
-    // Check URL for initial plan selection
+    // Check URL for initial state
     const url = new URL(window.location.href);
+
+    // Load search query from URL
+    const queryParam = url.searchParams.get("q");
+    if (queryParam) {
+      searchQuery = queryParam;
+    }
+
+    // Load plan selection from URL
     const planFilename = url.searchParams.get("plan");
     if (planFilename) {
       const plan = plans.find((p) => p.filename === planFilename);
@@ -794,7 +829,12 @@ async function init(): Promise<void> {
       }
     }
 
-    render();
+    // Apply filters if search query was loaded
+    if (searchQuery) {
+      applyFilters();
+    } else {
+      render();
+    }
   } catch (err) {
     app.innerHTML = `<div class="empty-state"><p>Failed to load plans</p><p class="hint">${err}</p></div>`;
   }

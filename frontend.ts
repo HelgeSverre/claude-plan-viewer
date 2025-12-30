@@ -1,5 +1,12 @@
+// Prism.js is loaded from CDN
+declare const Prism: {
+  highlight: (code: string, grammar: unknown, language: string) => string;
+  languages: Record<string, unknown>;
+};
+
 interface Plan {
   filename: string;
+  filepath: string;
   title: string;
   content: string;
   size: number;
@@ -17,6 +24,7 @@ let sortKey = "modified";
 let sortDir: "asc" | "desc" = "desc";
 let searchQuery = "";
 let showHelpModal = false;
+let selectedProjects: Set<string> = new Set();
 
 const app = document.getElementById("app")!;
 
@@ -83,10 +91,21 @@ function sortPlans(): void {
 function renderMarkdown(content: string): string {
   let html = escapeHtml(content);
 
-  // Code blocks (with language hint)
+  // Code blocks (with language hint and Prism highlighting)
   html = html.replace(
     /```(\w*)\n([\s\S]*?)```/g,
-    '<pre><code class="language-$1">$2</code></pre>'
+    (_, lang, code) => {
+      const language = lang || 'plaintext';
+      const grammar = Prism.languages[language] || Prism.languages.plaintext;
+      try {
+        const highlighted = grammar
+          ? Prism.highlight(code, grammar, language)
+          : code;
+        return `<pre class="language-${language}"><code class="language-${language}">${highlighted}</code></pre>`;
+      } catch {
+        return `<pre class="language-${language}"><code class="language-${language}">${code}</code></pre>`;
+      }
+    }
   );
 
   // Inline code
@@ -171,28 +190,100 @@ function renderMarkdown(content: string): string {
   return html;
 }
 
+function applyFilters(): void {
+  const query = searchQuery.toLowerCase();
+  filteredPlans = plans.filter((p) => {
+    // Apply project filter (empty set = show all)
+    if (selectedProjects.size > 0 && (!p.project || !selectedProjects.has(p.project))) {
+      return false;
+    }
+    // Apply search filter
+    if (query) {
+      return (
+        p.title.toLowerCase().includes(query) ||
+        p.content.toLowerCase().includes(query) ||
+        p.filename.toLowerCase().includes(query) ||
+        (p.project && p.project.toLowerCase().includes(query))
+      );
+    }
+    return true;
+  });
+  sortPlans();
+  render();
+}
+
+function getProjectTriggerText(projects: string[]): string {
+  if (selectedProjects.size === 0) {
+    return "All projects";
+  }
+  const selected = projects.filter(p => selectedProjects.has(p));
+  if (selected.length === 1) {
+    return selected[0];
+  }
+  return `${selected[0]} <span class="badge">+${selected.length - 1}</span>`;
+}
+
+function updateTableAndStats(): void {
+  const totalSize = filteredPlans.reduce((sum, p) => sum + p.size, 0);
+
+  // Update stats
+  const statsEl = document.querySelector(".stats");
+  if (statsEl) {
+    statsEl.innerHTML = `
+      <span>${filteredPlans.length}/${plans.length}</span>
+      <span class="divider">|</span>
+      <span>${formatSize(totalSize)}</span>
+    `;
+  }
+
+  // Update trigger text and style
+  const projects = [...new Set(plans.map(p => p.project).filter(Boolean))] as string[];
+  const trigger = document.getElementById("project-trigger");
+  if (trigger) {
+    trigger.classList.toggle("has-selection", selectedProjects.size > 0);
+    const chevronHtml = `<svg class="chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>`;
+    trigger.innerHTML = getProjectTriggerText(projects) + chevronHtml;
+  }
+
+  // Update table
+  const tbody = document.getElementById("plans-table");
+  if (tbody) {
+    tbody.innerHTML = filteredPlans.map((plan) => `
+      <tr data-filename="${plan.filename}" class="${selectedPlan?.filename === plan.filename ? "selected" : ""}">
+        <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}">${escapeHtml(plan.title)}</button></td>
+        <td class="project-cell">${plan.project || "—"}</td>
+        <td class="meta-cell">${formatDate(plan.modified)}</td>
+        <td class="meta-cell">${formatSize(plan.size)}</td>
+        <td class="meta-cell">${plan.lineCount}</td>
+      </tr>
+    `).join("");
+  }
+}
+
 function render(): void {
   const totalSize = filteredPlans.reduce((sum, p) => sum + p.size, 0);
+
+  // Get unique projects for filter chips
+  const projects = [...new Set(plans.map(p => p.project).filter(Boolean))] as string[];
+  projects.sort();
 
   app.innerHTML = `
     <div class="container">
       <div class="list-panel">
         <div class="header">
-          <div class="header-top">
+          <div class="header-row">
             <h1>
               <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              Claude Plans
+              Plans
             </h1>
-            <span class="kbd">Cmd+K</span>
-          </div>
-          <div class="search-bar">
             <div class="search-wrapper">
               <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <input type="text" class="search-input" id="search" placeholder="Search plans..." value="${escapeHtml(searchQuery)}" autofocus>
+              <input type="search" class="search-input" id="search" placeholder="Search..." value="${escapeHtml(searchQuery)}" autofocus>
+              <span class="search-kbd">⌘K</span>
             </div>
             <select class="sort-select" id="sort">
               <option value="modified-desc" ${sortKey === "modified" && sortDir === "desc" ? "selected" : ""}>Modified (newest)</option>
@@ -203,12 +294,35 @@ function render(): void {
               <option value="title-desc" ${sortKey === "title" && sortDir === "desc" ? "selected" : ""}>Title (Z-A)</option>
               <option value="size-desc" ${sortKey === "size" && sortDir === "desc" ? "selected" : ""}>Size (largest)</option>
               <option value="size-asc" ${sortKey === "size" && sortDir === "asc" ? "selected" : ""}>Size (smallest)</option>
+              <option value="lines-desc" ${sortKey === "lines" && sortDir === "desc" ? "selected" : ""}>Lines (most)</option>
+              <option value="lines-asc" ${sortKey === "lines" && sortDir === "asc" ? "selected" : ""}>Lines (least)</option>
             </select>
-          </div>
-          <div class="stats">
-            <span>${filteredPlans.length} of ${plans.length} plans</span>
-            <span class="divider">|</span>
-            <span>${formatSize(totalSize)}</span>
+            ${projects.length > 0 ? `
+            <div class="project-dropdown">
+              <button class="dropdown-trigger ${selectedProjects.size > 0 ? 'has-selection' : ''}" id="project-trigger" popovertarget="project-menu">
+                ${getProjectTriggerText(projects)}
+                <svg class="chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <div id="project-menu" popover class="dropdown-menu">
+                ${projects.map(p => `
+                  <label class="dropdown-item">
+                    <input type="checkbox" value="${escapeHtml(p)}" ${selectedProjects.has(p) ? 'checked' : ''}>
+                    <span>${escapeHtml(p)}</span>
+                  </label>
+                `).join('')}
+                ${selectedProjects.size > 0 ? `
+                  <button class="dropdown-clear" id="clear-projects">Clear all</button>
+                ` : ''}
+              </div>
+            </div>
+            ` : ''}
+            <div class="stats">
+              <span>${filteredPlans.length}/${plans.length}</span>
+              <span class="divider">|</span>
+              <span>${formatSize(totalSize)}</span>
+            </div>
           </div>
         </div>
         <div class="table-container">
@@ -227,6 +341,9 @@ function render(): void {
                 <th data-sort="size" class="${sortKey === "size" ? "sorted " + sortDir : ""}">
                   Size <span class="sort-icon">▲</span>
                 </th>
+                <th data-sort="lines" class="${sortKey === "lines" ? "sorted " + sortDir : ""}">
+                  Lines <span class="sort-icon">▲</span>
+                </th>
               </tr>
             </thead>
             <tbody id="plans-table">
@@ -234,10 +351,11 @@ function render(): void {
                 .map(
                   (plan) => `
                 <tr data-filename="${plan.filename}" class="${selectedPlan?.filename === plan.filename ? "selected" : ""}">
-                  <td class="title-cell">${escapeHtml(plan.title)}</td>
+                  <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}">${escapeHtml(plan.title)}</button></td>
                   <td class="project-cell">${plan.project || "—"}</td>
                   <td class="meta-cell">${formatDate(plan.modified)}</td>
                   <td class="meta-cell">${formatSize(plan.size)}</td>
+                  <td class="meta-cell">${plan.lineCount}</td>
                 </tr>
               `
                 )
@@ -253,11 +371,23 @@ function render(): void {
           <div class="detail-header">
             <div class="detail-header-top">
               <div class="detail-title">${escapeHtml(selectedPlan.title)}</div>
-              <button class="copy-btn" id="copy-btn" title="Copy markdown">
-                <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </button>
+              <div class="detail-actions">
+                <button class="action-btn" id="copy-btn" title="Copy markdown">
+                  <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
+                <button class="action-btn" id="copy-path-btn" title="Copy file path">
+                  <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                </button>
+                <button class="action-btn" id="open-editor-btn" title="Open in editor">
+                  <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div class="detail-meta">
               ${selectedPlan.project ? `<span class="project-tag">${selectedPlan.project}</span>` : ""}
@@ -312,20 +442,49 @@ function attachEventListeners(): void {
 
   searchInput?.addEventListener("input", (e) => {
     searchQuery = (e.target as HTMLInputElement).value;
-    const query = searchQuery.toLowerCase();
-    filteredPlans = plans.filter(
-      (p) =>
-        p.title.toLowerCase().includes(query) ||
-        p.content.toLowerCase().includes(query) ||
-        p.filename.toLowerCase().includes(query) ||
-        (p.project && p.project.toLowerCase().includes(query))
-    );
-    sortPlans();
-    render();
+    applyFilters();
     // Restore focus and cursor position after render
     const newInput = document.getElementById("search") as HTMLInputElement;
     newInput?.focus();
     newInput?.setSelectionRange(searchQuery.length, searchQuery.length);
+  });
+
+  // Project dropdown handlers
+  const projectMenu = document.getElementById("project-menu") as HTMLElement | null;
+  projectMenu?.addEventListener("change", (e) => {
+    const checkbox = e.target as HTMLInputElement;
+    if (checkbox.type === "checkbox") {
+      if (checkbox.checked) {
+        selectedProjects.add(checkbox.value);
+      } else {
+        selectedProjects.delete(checkbox.value);
+      }
+      // Update filter without full re-render to keep popover open
+      const query = searchQuery.toLowerCase();
+      filteredPlans = plans.filter((p) => {
+        if (selectedProjects.size > 0 && (!p.project || !selectedProjects.has(p.project))) {
+          return false;
+        }
+        if (query) {
+          return (
+            p.title.toLowerCase().includes(query) ||
+            p.content.toLowerCase().includes(query) ||
+            p.filename.toLowerCase().includes(query) ||
+            (p.project && p.project.toLowerCase().includes(query))
+          );
+        }
+        return true;
+      });
+      sortPlans();
+      // Update just the table and stats without closing popover
+      updateTableAndStats();
+    }
+  });
+
+  document.getElementById("clear-projects")?.addEventListener("click", () => {
+    selectedProjects.clear();
+    projectMenu?.hidePopover();
+    applyFilters();
   });
 
   sortSelect?.addEventListener("change", (e) => {
@@ -374,32 +533,71 @@ function attachEventListeners(): void {
     }
   });
 
-  // Copy button handler
+  // Copy markdown button handler
   document.getElementById("copy-btn")?.addEventListener("click", async () => {
     if (!selectedPlan) return;
     try {
       await navigator.clipboard.writeText(selectedPlan.content);
-      const btn = document.getElementById("copy-btn");
-      if (btn) {
-        btn.classList.add("copied");
-        btn.innerHTML = `
-          <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
-        `;
-        setTimeout(() => {
-          btn.classList.remove("copied");
-          btn.innerHTML = `
-            <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          `;
-        }, 1500);
-      }
+      showCopiedFeedback("copy-btn");
     } catch (err) {
       console.error("Failed to copy:", err);
     }
   });
+
+  // Copy path button handler
+  document.getElementById("copy-path-btn")?.addEventListener("click", async () => {
+    if (!selectedPlan) return;
+    try {
+      await navigator.clipboard.writeText(selectedPlan.filepath);
+      showCopiedFeedback("copy-path-btn");
+    } catch (err) {
+      console.error("Failed to copy path:", err);
+    }
+  });
+
+  // Open in editor button handler
+  document.getElementById("open-editor-btn")?.addEventListener("click", async () => {
+    if (!selectedPlan) return;
+    try {
+      await fetch("/api/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filepath: selectedPlan.filepath }),
+      });
+    } catch (err) {
+      console.error("Failed to open in editor:", err);
+    }
+  });
+
+  // Title button click handler for keyboard accessibility
+  document.querySelectorAll(".title-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const filename = (btn as HTMLButtonElement).dataset.filename;
+      const plan = filteredPlans.find((p) => p.filename === filename);
+      if (plan) {
+        selectedPlan = plan;
+        render();
+      }
+    });
+  });
+}
+
+function showCopiedFeedback(btnId: string): void {
+  const btn = document.getElementById(btnId);
+  if (btn) {
+    btn.classList.add("copied");
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = `
+      <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+      </svg>
+    `;
+    setTimeout(() => {
+      btn.classList.remove("copied");
+      btn.innerHTML = originalHtml;
+    }, 1500);
+  }
 }
 
 // Global keyboard navigation

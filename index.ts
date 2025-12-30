@@ -10,8 +10,9 @@ const PLANS_DIR = join(homedir(), ".claude", "plans");
 function getPort(): number | undefined {
   const args = process.argv;
   const portIndex = args.indexOf("--port");
-  if (portIndex !== -1 && args[portIndex + 1]) {
-    const port = parseInt(args[portIndex + 1], 10);
+  const portArg = args[portIndex + 1];
+  if (portIndex !== -1 && portArg) {
+    const port = parseInt(portArg, 10);
     if (!isNaN(port)) return port;
   }
   return undefined;
@@ -19,6 +20,7 @@ function getPort(): number | undefined {
 
 interface Plan {
   filename: string;
+  filepath: string;
   title: string;
   content: string;
   size: number;
@@ -32,15 +34,15 @@ interface Plan {
 function extractProject(content: string): string | null {
   // Match paths like /Users/*/code/projectname/...
   const codeMatch = content.match(/\/Users\/\w+\/code\/([\w.-]+)/);
-  if (codeMatch) return codeMatch[1];
+  if (codeMatch?.[1]) return codeMatch[1];
 
   // Match paths like /private/var/.../projectname/... (temp dirs)
   const privateMatch = content.match(/\/private\/var\/[\w\/-]+\/([\w.-]+)\/(?:src|lib|app|test)/);
-  if (privateMatch) return privateMatch[1];
+  if (privateMatch?.[1]) return privateMatch[1];
 
   // Match common project structure paths
   const structMatch = content.match(/`([^`\/]+)\/(?:src|lib|app|docs|tests?|spec)\/[^`]+`/);
-  if (structMatch) return structMatch[1];
+  if (structMatch?.[1]) return structMatch[1];
 
   return null;
 }
@@ -59,7 +61,7 @@ async function loadPlans(): Promise<Plan[]> {
       ]);
 
       const titleMatch = content.match(/^#\s+(.+)$/m);
-      const title = titleMatch
+      const title = titleMatch?.[1]
         ? titleMatch[1].replace(/^Plan:\s*/i, "")
         : filename.replace(".md", "");
 
@@ -101,7 +103,7 @@ const server = Bun.serve({
           // Open in default editor using 'open' command on macOS
           await Bun.$`open ${filepath}`;
           return Response.json({ success: true });
-        } catch (err) {
+        } catch {
           return new Response("Failed to open file", { status: 500 });
         }
       },

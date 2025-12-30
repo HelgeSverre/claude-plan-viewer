@@ -3,11 +3,12 @@ import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import index from "./index.html";
+import prismBundlePath from "./prism.bundle.js" with { type: "file" };
 
 const PLANS_DIR = join(homedir(), ".claude", "plans");
 
 // Parse --port from command line arguments (undefined = auto-assign)
-function getPort(): number | undefined {
+function getRequestedPort(): number | undefined {
   const args = process.argv;
   const portIndex = args.indexOf("--port");
   const portArg = args[portIndex + 1];
@@ -16,6 +17,38 @@ function getPort(): number | undefined {
     if (!isNaN(port)) return port;
   }
   return undefined;
+}
+
+// Find an available port starting from the requested port
+async function findAvailablePort(startPort: number = 3000): Promise<number> {
+  let port = startPort;
+  const maxAttempts = 100;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const testServer = Bun.serve({
+        port,
+        fetch: () => new Response(),
+      });
+      testServer.stop();
+      return port;
+    } catch {
+      port++;
+    }
+  }
+  throw new Error(`No available port found in range ${startPort}-${startPort + maxAttempts}`);
+}
+
+// Cross-platform open file in default editor
+async function openInEditor(filepath: string): Promise<void> {
+  const platform = process.platform;
+  if (platform === "darwin") {
+    await Bun.$`open ${filepath}`;
+  } else if (platform === "win32") {
+    await Bun.$`cmd /c start "" ${filepath}`;
+  } else {
+    await Bun.$`xdg-open ${filepath}`;
+  }
 }
 
 interface Plan {
@@ -85,35 +118,45 @@ async function loadPlans(): Promise<Plan[]> {
   );
 }
 
-const server = Bun.serve({
-  port: getPort(),
-  routes: {
-    "/": index,
-    "/api/plans": async () => {
-      const plans = await loadPlans();
-      return Response.json(plans);
+// Main server startup
+async function startServer() {
+  const requestedPort = getRequestedPort();
+  const port = await findAvailablePort(requestedPort ?? 3000);
+
+  const server = Bun.serve({
+    port,
+    static: {
+      "/prism.bundle.js": Bun.file(prismBundlePath),
     },
-    "/api/open": {
-      POST: async (req) => {
-        const { filepath } = await req.json();
-        if (!filepath || !filepath.startsWith(PLANS_DIR)) {
-          return new Response("Invalid path", { status: 400 });
-        }
-        try {
-          // Open in default editor using 'open' command on macOS
-          await Bun.$`open ${filepath}`;
-          return Response.json({ success: true });
-        } catch {
-          return new Response("Failed to open file", { status: 500 });
-        }
+    routes: {
+      "/": index,
+      "/api/plans": async () => {
+        const plans = await loadPlans();
+        return Response.json(plans);
+      },
+      "/api/open": {
+        POST: async (req) => {
+          const { filepath } = await req.json();
+          if (!filepath || !filepath.startsWith(PLANS_DIR)) {
+            return new Response("Invalid path", { status: 400 });
+          }
+          try {
+            await openInEditor(filepath);
+            return Response.json({ success: true });
+          } catch {
+            return new Response("Failed to open file", { status: 500 });
+          }
+        },
       },
     },
-  },
-  development: {
-    hmr: true,
-    console: true,
-  },
-});
+    development: process.env.NODE_ENV !== "production" ? {
+      hmr: true,
+      console: true,
+    } : undefined,
+  });
+
+  return server;
+}
 
 // ANSI color codes
 const c = {
@@ -126,8 +169,9 @@ const c = {
   magenta: "\x1b[35m",
 };
 
-// Startup output
+// Main entry point
 (async () => {
+  const server = await startServer();
   const planCount = (await readdir(PLANS_DIR)).filter(f => f.endsWith('.md')).length;
   console.log();
   console.log(`${c.bold}${c.magenta}  📋 Plans Viewer${c.reset}`);

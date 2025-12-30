@@ -10,11 +10,19 @@
     "index.ts",
     "index.html",
     "frontend.ts",
-    "styles.css"
+    "styles.css",
+    "prism.bundle.js"
   ],
   "scripts": {
     "start": "bun index.ts",
-    "dev": "bun --hot index.ts"
+    "dev": "bun --hot index.ts",
+    "build": "bun build --compile --minify --bytecode ./index.ts --outfile ./dist/plans-viewer",
+    "build:macos-arm64": "bun build --compile --target=bun-darwin-arm64 --minify --bytecode ./index.ts --outfile ./dist/plans-viewer-macos-arm64",
+    "build:macos-x64": "bun build --compile --target=bun-darwin-x64 --minify --bytecode ./index.ts --outfile ./dist/plans-viewer-macos-x64",
+    "build:linux-x64": "bun build --compile --target=bun-linux-x64 --minify --bytecode ./index.ts --outfile ./dist/plans-viewer-linux-x64",
+    "build:linux-arm64": "bun build --compile --target=bun-linux-arm64 --minify --bytecode ./index.ts --outfile ./dist/plans-viewer-linux-arm64",
+    "build:windows": "bun build --compile --target=bun-windows-x64 --minify --bytecode ./index.ts --outfile ./dist/plans-viewer-windows.exe",
+    "build:all": "bun run build:macos-arm64 && bun run build:macos-x64 && bun run build:linux-x64 && bun run build:linux-arm64 && bun run build:windows"
   },
   "keywords": [
     "claude",

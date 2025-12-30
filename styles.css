@@ -974,10 +974,10 @@ tr.selected .title-btn {
 
 /* Search highlighting */
 mark {
-  background: rgba(234, 179, 8, 0.25);
-  color: inherit;
-  padding: 0 2px;
-  border-radius: 2px;
+  background: rgba(234, 179, 8, 0.4);
+  color: var(--text-primary);
+  padding: 1px 3px;
+  border-radius: 3px;
 }
 
 /* Refresh loading animation */

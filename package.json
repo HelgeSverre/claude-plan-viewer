@@ -1,0 +1,45 @@
+{
+  "name": "claude-plan-viewer",
+  "version": "1.0.0",
+  "description": "A web-based viewer for Claude Code plan files",
+  "type": "module",
+  "bin": {
+    "claude-plan-viewer": "./index.ts"
+  },
+  "files": [
+    "index.ts",
+    "index.html",
+    "frontend.ts",
+    "styles.css"
+  ],
+  "scripts": {
+    "start": "bun index.ts",
+    "dev": "bun --hot index.ts"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "plan-viewer",
+    "markdown",
+    "viewer"
+  ],
+  "author": "Helge Sverre <helge.sverre@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/helgesverre/claude-plan-viewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/helgesverre/claude-plan-viewer/issues"
+  },
+  "homepage": "https://github.com/helgesverre/claude-plan-viewer#readme",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

@@ -6,6 +6,17 @@ import index from "./index.html";
 
 const PLANS_DIR = join(homedir(), ".claude", "plans");
 
+// Parse --port from command line arguments (undefined = auto-assign)
+function getPort(): number | undefined {
+  const args = process.argv;
+  const portIndex = args.indexOf("--port");
+  if (portIndex !== -1 && args[portIndex + 1]) {
+    const port = parseInt(args[portIndex + 1], 10);
+    if (!isNaN(port)) return port;
+  }
+  return undefined;
+}
+
 interface Plan {
   filename: string;
   title: string;
@@ -73,7 +84,7 @@ async function loadPlans(): Promise<Plan[]> {
 }
 
 const server = Bun.serve({
-  port: 3000,
+  port: getPort(),
   routes: {
     "/": index,
     "/api/plans": async () => {

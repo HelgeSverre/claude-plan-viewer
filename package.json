@@ -35,12 +35,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/helgesverre/claude-plan-viewer.git"
+    "url": "git+https://github.com/HelgeSverre/claude-plan-viewer.git"
   },
   "bugs": {
-    "url": "https://github.com/helgesverre/claude-plan-viewer/issues"
+    "url": "https://github.com/HelgeSverre/claude-plan-viewer/issues"
   },
-  "homepage": "https://github.com/helgesverre/claude-plan-viewer#readme",
+  "homepage": "https://github.com/HelgeSverre/claude-plan-viewer#readme",
   "engines": {
     "bun": ">=1.0.0"
   },

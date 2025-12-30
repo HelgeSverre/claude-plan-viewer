@@ -54,6 +54,7 @@ async function loadPlans(): Promise<Plan[]> {
 
       return {
         filename,
+        filepath,
         title,
         content,
         size: stats.size,
@@ -78,6 +79,21 @@ const server = Bun.serve({
     "/api/plans": async () => {
       const plans = await loadPlans();
       return Response.json(plans);
+    },
+    "/api/open": {
+      POST: async (req) => {
+        const { filepath } = await req.json();
+        if (!filepath || !filepath.startsWith(PLANS_DIR)) {
+          return new Response("Invalid path", { status: 400 });
+        }
+        try {
+          // Open in default editor using 'open' command on macOS
+          await Bun.$`open ${filepath}`;
+          return Response.json({ success: true });
+        } catch (err) {
+          return new Response("Failed to open file", { status: 500 });
+        }
+      },
     },
   },
   development: {

@@ -6,6 +6,7 @@ import index from "./index.html";
 import prismBundlePath from "./prism.bundle.js" with { type: "file" };
 
 const PLANS_DIR = join(homedir(), ".claude", "plans");
+const PROJECTS_DIR = join(homedir(), ".claude", "projects");
 
 // Parse --port from command line arguments (undefined = auto-assign)
 function getRequestedPort(): number | undefined {
@@ -64,23 +65,101 @@ interface Plan {
   project: string | null;
 }
 
-function extractProject(content: string): string | null {
-  // Match paths like /Users/*/code/projectname/...
-  const codeMatch = content.match(/\/Users\/\w+\/code\/([\w.-]+)/);
-  if (codeMatch?.[1]) return codeMatch[1];
+// Extract project name from a full path (cross-platform)
+// e.g., "/Users/helge/code/plans-viewer" -> "plans-viewer"
+// e.g., "C:\Users\name\code\my-app" -> "my-app"
+function extractProjectName(cwd: string): string {
+  if (!cwd) return "";
+  // Normalize: handle both / and \ separators
+  const normalized = cwd.replace(/\\/g, "/");
+  // Remove trailing slash
+  const trimmed = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+  // Get last segment
+  const lastSlash = trimmed.lastIndexOf("/");
+  return lastSlash === -1 ? trimmed : trimmed.slice(lastSlash + 1);
+}
 
-  // Match paths like /private/var/.../projectname/... (temp dirs)
-  const privateMatch = content.match(/\/private\/var\/[\w\/-]+\/([\w.-]+)\/(?:src|lib|app|test)/);
-  if (privateMatch?.[1]) return privateMatch[1];
+// Extract cwd (working directory) from JSONL content
+function extractCwdFromJsonl(content: string): string | null {
+  if (!content) return null;
+  const match = content.match(/"cwd":"([^"]+)"/);
+  if (!match) return null;
+  // Unescape JSON string (convert \\\\ to \\)
+  return match[1].replace(/\\\\/g, "\\");
+}
 
-  // Match common project structure paths
-  const structMatch = content.match(/`([^`\/]+)\/(?:src|lib|app|docs|tests?|spec)\/[^`]+`/);
-  if (structMatch?.[1]) return structMatch[1];
+// Extract unique slugs from JSONL content
+function extractSlugsFromJsonl(content: string): string[] {
+  if (!content) return [];
+  const slugs = new Set<string>();
+  const matches = content.matchAll(/"slug":"([\w-]+)"/g);
+  for (const match of matches) {
+    slugs.add(match[1]);
+  }
+  return Array.from(slugs);
+}
 
-  return null;
+interface ProjectMapping {
+  [slug: string]: string; // plan slug -> project name
+}
+
+// Build a mapping of plan slugs to project names by scanning Claude Code's project metadata
+async function buildProjectMapping(): Promise<ProjectMapping> {
+  const mapping: ProjectMapping = {};
+
+  try {
+    const projectDirs = await readdir(PROJECTS_DIR);
+
+    for (const dir of projectDirs) {
+      const dirPath = join(PROJECTS_DIR, dir);
+      const dirStats = await stat(dirPath);
+      if (!dirStats.isDirectory()) continue;
+
+      // Find JSONL files and extract cwd + slugs
+      const files = await readdir(dirPath);
+      const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
+
+      let projectName: string | null = null;
+      const allSlugs: string[] = [];
+
+      for (const file of jsonlFiles) {
+        try {
+          const content = await Bun.file(join(dirPath, file)).text();
+
+          // Get project name from cwd (only need to find it once)
+          if (!projectName) {
+            const cwd = extractCwdFromJsonl(content);
+            if (cwd) {
+              projectName = extractProjectName(cwd);
+            }
+          }
+
+          // Collect all slugs
+          const slugs = extractSlugsFromJsonl(content);
+          allSlugs.push(...slugs);
+        } catch {
+          // Skip files that can't be read
+        }
+      }
+
+      // Map all slugs to this project
+      if (projectName) {
+        for (const slug of allSlugs) {
+          mapping[slug] = projectName;
+        }
+      }
+    }
+  } catch {
+    // Projects dir may not exist, return empty mapping
+  }
+
+  return mapping;
 }
 
 async function loadPlans(): Promise<Plan[]> {
+  // Build project mapping from Claude Code metadata
+  const projectMapping = await buildProjectMapping();
+
   const files = await readdir(PLANS_DIR);
   const mdFiles = files.filter((f) => f.endsWith(".md"));
 
@@ -98,6 +177,9 @@ async function loadPlans(): Promise<Plan[]> {
         ? titleMatch[1].replace(/^Plan:\s*/i, "")
         : filename.replace(".md", "");
 
+      // Look up project from metadata using plan slug (filename without .md)
+      const slug = filename.replace(".md", "");
+
       return {
         filename,
         filepath,
@@ -108,7 +190,7 @@ async function loadPlans(): Promise<Plan[]> {
         created: stats.birthtime.toISOString(),
         lineCount: content.split("\n").length,
         wordCount: content.split(/\s+/).filter(Boolean).length,
-        project: extractProject(content),
+        project: projectMapping[slug] || null,
       };
     })
   );

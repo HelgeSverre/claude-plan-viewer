@@ -822,10 +822,13 @@ tr.selected .title-btn {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  flex: 1;
+  width: 100%;
+  min-height: 100%;
   color: var(--text-muted);
   text-align: center;
   padding: 40px;
+  box-sizing: border-box;
 }
 
 .empty-state .icon {
@@ -850,7 +853,9 @@ tr.selected .title-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  flex: 1;
+  width: 100%;
+  min-height: 100%;
   color: var(--text-muted);
 }
 

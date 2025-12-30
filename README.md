@@ -1,10 +1,10 @@
-# claude-plan-viewer
+# Claude Plan Viewer
+
+> Browse, search, and read your Claude Code plans in a clean web UI
 
 [![npm version](https://img.shields.io/npm/v/claude-plan-viewer.svg)](https://www.npmjs.com/package/claude-plan-viewer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Bun](https://img.shields.io/badge/Bun-%23000000.svg?logo=bun&logoColor=white)](https://bun.sh)
-
-A web-based viewer for Claude Code plan files stored in `~/.claude/plans`.
 
 ![screenshot](screenshot.png)
 

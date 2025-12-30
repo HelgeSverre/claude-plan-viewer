@@ -15,10 +15,18 @@
   --text-primary: #e5e5e5;
   --text-secondary: #a3a3a3;
   --text-muted: #666666;
-  --accent: #3b82f6;
-  --accent-dim: #1d4ed8;
-  --success: #22c55e;
-  --warning: #eab308;
+  --accent: #6b8acd;
+  --accent-dim: #3d5a80;
+  --accent-subtle: rgba(107, 138, 205, 0.15);
+  --success: #5cb85c;
+  --warning: #d4a017;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 7px;
+  --spacing-xs: 4px;
+  --spacing-sm: 6px;
+  --spacing-md: 10px;
+  --focus-ring: 0 0 0 2px var(--accent-subtle);
 }
 
 body {
@@ -58,78 +66,94 @@ body {
   background: var(--bg-secondary);
 }
 
-.header-top {
+.header-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
+  gap: 10px;
 }
 
 .header h1 {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .header h1 .icon {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   opacity: 0.8;
-}
-
-.kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 5px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.search-bar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
 }
 
 .search-wrapper {
   flex: 1;
   position: relative;
+  min-width: 120px;
+  max-width: 280px;
 }
 
 .search-icon {
   position: absolute;
-  left: 10px;
+  left: var(--spacing-md);
   top: 50%;
   transform: translateY(-50%);
   width: 14px;
   height: 14px;
   color: var(--text-muted);
+  pointer-events: none;
+}
+
+.search-kbd {
+  position: absolute;
+  right: var(--spacing-sm);
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 500;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.search-input:focus + .search-kbd,
+.search-input:not(:placeholder-shown) + .search-kbd {
+  opacity: 0.3;
 }
 
 .search-input {
   width: 100%;
-  padding: 6px 10px 6px 32px;
+  padding: var(--spacing-sm) 48px var(--spacing-sm) 32px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   font-family: inherit;
   font-size: 12px;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.search-input::-webkit-search-cancel-button,
+.search-input::-webkit-search-decoration {
+  display: none;
 }
 
 .search-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  box-shadow: var(--focus-ring);
 }
 
 .search-input::placeholder {
@@ -137,10 +161,10 @@ body {
 }
 
 .sort-select {
-  padding: 6px 26px 6px 10px;
+  padding: var(--spacing-sm) 26px var(--spacing-sm) var(--spacing-md);
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   font-family: inherit;
   font-size: 11px;
@@ -151,18 +175,192 @@ body {
   background-repeat: no-repeat;
   background-position: right 8px center;
   background-size: 12px;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .sort-select:hover {
   border-color: var(--border-light);
 }
 
+.sort-select:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+/* Project Dropdown */
+.project-dropdown {
+  position: relative;
+}
+
+.dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  white-space: nowrap;
+  outline: none;
+  anchor-name: --project-trigger;
+}
+
+.dropdown-trigger:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+.dropdown-trigger:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.dropdown-trigger.has-selection {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.dropdown-trigger .chevron {
+  width: 12px;
+  height: 12px;
+  opacity: 0.5;
+}
+
+.dropdown-trigger .badge {
+  background: var(--accent);
+  color: white;
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.dropdown-menu {
+  position: absolute;
+  position-anchor: --project-trigger;
+  top: anchor(bottom);
+  left: anchor(left);
+  margin: 0;
+  margin-top: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  min-width: 180px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.dropdown-menu:popover-open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-primary);
+  transition: background 0.1s;
+}
+
+.dropdown-item:hover {
+  background: var(--bg-hover);
+}
+
+/* Custom checkbox styling */
+.dropdown-item input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dropdown-item input[type="checkbox"]:hover {
+  border-color: var(--accent);
+}
+
+.dropdown-item input[type="checkbox"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.dropdown-item input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.dropdown-item input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.dropdown-item span {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+.dropdown-clear {
+  margin-top: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  text-align: center;
+  transition: color 0.15s, background 0.15s;
+  outline: none;
+}
+
+.dropdown-clear:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.dropdown-clear:focus {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
 .stats {
   font-size: 11px;
   color: var(--text-muted);
-  margin-top: 8px;
   display: flex;
   gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .stats .divider {
@@ -270,6 +468,35 @@ tr.selected:hover {
   font-weight: 500;
 }
 
+.title-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  outline: none;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s;
+}
+
+.title-btn:hover {
+  color: var(--accent);
+}
+
+.title-btn:focus {
+  box-shadow: var(--focus-ring);
+  color: var(--accent);
+}
+
+tr.selected .title-btn {
+  color: var(--text-primary);
+}
+
 .project-cell {
   color: var(--accent);
   font-family: 'JetBrains Mono', monospace;
@@ -313,7 +540,13 @@ tr.selected:hover {
   flex: 1;
 }
 
-.copy-btn {
+.detail-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.action-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -321,26 +554,32 @@ tr.selected:hover {
   height: 28px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s, color 0.15s;
   flex-shrink: 0;
+  outline: none;
 }
 
-.copy-btn:hover {
+.action-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
   border-color: var(--border-light);
 }
 
-.copy-btn.copied {
+.action-btn:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.action-btn.copied {
   background: var(--success);
   border-color: var(--success);
   color: white;
 }
 
-.copy-btn .icon {
+.action-btn .icon {
   width: 14px;
   height: 14px;
 }
@@ -629,18 +868,31 @@ tr.selected:hover {
 }
 
 .modal-close {
-  background: none;
-  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   color: var(--text-muted);
-  font-size: 20px;
+  font-size: 16px;
   cursor: pointer;
-  padding: 0;
   line-height: 1;
-  transition: color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s, color 0.15s;
+  outline: none;
 }
 
 .modal-close:hover {
+  background: var(--bg-hover);
   color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+.modal-close:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .modal-body {
@@ -664,10 +916,10 @@ tr.selected:hover {
   align-items: center;
   justify-content: center;
   min-width: 24px;
-  padding: 4px 8px;
+  padding: var(--spacing-xs) var(--spacing-sm);
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   color: var(--text-secondary);

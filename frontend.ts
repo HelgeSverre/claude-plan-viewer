@@ -1,3 +1,8 @@
+// HMR support
+if (import.meta.hot) {
+  import.meta.hot.accept();
+}
+
 // Prism.js is loaded from CDN
 declare const Prism: {
   highlight: (code: string, grammar: unknown, language: string) => string;
@@ -25,8 +30,71 @@ let sortDir: "asc" | "desc" = "desc";
 let searchQuery = "";
 let showHelpModal = false;
 let selectedProjects: Set<string> = new Set();
+const scrollPositions = new Map<string, number>();
 
 const app = document.getElementById("app")!;
+
+function selectPlan(plan: Plan | null): void {
+  // Save scroll position of current plan
+  if (selectedPlan) {
+    const detailContent = document.querySelector(".detail-content");
+    if (detailContent) {
+      scrollPositions.set(selectedPlan.filename, detailContent.scrollTop);
+    }
+  }
+
+  selectedPlan = plan;
+
+  // Update URL
+  if (plan) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("plan", plan.filename);
+    history.pushState(null, "", url.toString());
+  } else {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("plan");
+    history.pushState(null, "", url.toString());
+  }
+
+  render();
+
+  // Restore scroll position
+  if (plan) {
+    const savedScroll = scrollPositions.get(plan.filename);
+    if (savedScroll !== undefined) {
+      requestAnimationFrame(() => {
+        const detailContent = document.querySelector(".detail-content");
+        if (detailContent) {
+          detailContent.scrollTop = savedScroll;
+        }
+      });
+    }
+  }
+}
+
+async function openInEditor(): Promise<void> {
+  if (!selectedPlan) return;
+  try {
+    await fetch("/api/open", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filepath: selectedPlan.filepath }),
+    });
+  } catch (err) {
+    console.error("Failed to open in editor:", err);
+  }
+}
+
+function highlightText(text: string, query: string): string {
+  if (!query) return escapeHtml(text);
+  const escaped = escapeHtml(text);
+  const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+  return escaped.replace(regex, '<mark>$1</mark>');
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 function escapeHtml(str: string): string {
   return str
@@ -82,6 +150,9 @@ function sortPlans(): void {
         break;
       case "lines":
         cmp = a.lineCount - b.lineCount;
+        break;
+      case "created":
+        cmp = new Date(a.created).getTime() - new Date(b.created).getTime();
         break;
     }
     return sortDir === "asc" ? cmp : -cmp;
@@ -250,11 +321,12 @@ function updateTableAndStats(): void {
   if (tbody) {
     tbody.innerHTML = filteredPlans.map((plan) => `
       <tr data-filename="${plan.filename}" class="${selectedPlan?.filename === plan.filename ? "selected" : ""}">
-        <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}">${escapeHtml(plan.title)}</button></td>
-        <td class="project-cell">${plan.project || "—"}</td>
+        <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}">${highlightText(plan.title, searchQuery)}</button></td>
+        <td class="project-cell">${plan.project ? highlightText(plan.project, searchQuery) : "—"}</td>
+        <td class="num-cell">${formatSize(plan.size)}</td>
+        <td class="num-cell">${plan.lineCount}</td>
         <td class="meta-cell">${formatDate(plan.modified)}</td>
-        <td class="meta-cell">${formatSize(plan.size)}</td>
-        <td class="meta-cell">${plan.lineCount}</td>
+        <td class="meta-cell">${formatDate(plan.created)}</td>
       </tr>
     `).join("");
   }
@@ -278,6 +350,7 @@ function render(): void {
               </svg>
               Plans
             </h1>
+            <div class="header-spacer"></div>
             <div class="search-wrapper">
               <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -296,6 +369,8 @@ function render(): void {
               <option value="size-asc" ${sortKey === "size" && sortDir === "asc" ? "selected" : ""}>Size (smallest)</option>
               <option value="lines-desc" ${sortKey === "lines" && sortDir === "desc" ? "selected" : ""}>Lines (most)</option>
               <option value="lines-asc" ${sortKey === "lines" && sortDir === "asc" ? "selected" : ""}>Lines (least)</option>
+              <option value="created-desc" ${sortKey === "created" && sortDir === "desc" ? "selected" : ""}>Created (newest)</option>
+              <option value="created-asc" ${sortKey === "created" && sortDir === "asc" ? "selected" : ""}>Created (oldest)</option>
             </select>
             ${projects.length > 0 ? `
             <div class="project-dropdown">
@@ -318,11 +393,11 @@ function render(): void {
               </div>
             </div>
             ` : ''}
-            <div class="stats">
-              <span>${filteredPlans.length}/${plans.length}</span>
-              <span class="divider">|</span>
-              <span>${formatSize(totalSize)}</span>
-            </div>
+            <button class="action-btn" id="refresh-btn" title="Refresh plans">
+              <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
           </div>
         </div>
         <div class="table-container">
@@ -335,14 +410,17 @@ function render(): void {
                 <th data-sort="project" class="${sortKey === "project" ? "sorted " + sortDir : ""}">
                   Project <span class="sort-icon">▲</span>
                 </th>
+                <th data-sort="size" class="num-col ${sortKey === "size" ? "sorted " + sortDir : ""}">
+                  Size <span class="sort-icon">▲</span>
+                </th>
+                <th data-sort="lines" class="num-col ${sortKey === "lines" ? "sorted " + sortDir : ""}">
+                  Lines <span class="sort-icon">▲</span>
+                </th>
                 <th data-sort="modified" class="${sortKey === "modified" ? "sorted " + sortDir : ""}">
                   Modified <span class="sort-icon">▲</span>
                 </th>
-                <th data-sort="size" class="${sortKey === "size" ? "sorted " + sortDir : ""}">
-                  Size <span class="sort-icon">▲</span>
-                </th>
-                <th data-sort="lines" class="${sortKey === "lines" ? "sorted " + sortDir : ""}">
-                  Lines <span class="sort-icon">▲</span>
+                <th data-sort="created" class="${sortKey === "created" ? "sorted " + sortDir : ""}">
+                  Created <span class="sort-icon">▲</span>
                 </th>
               </tr>
             </thead>
@@ -351,11 +429,12 @@ function render(): void {
                 .map(
                   (plan) => `
                 <tr data-filename="${plan.filename}" class="${selectedPlan?.filename === plan.filename ? "selected" : ""}">
-                  <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}">${escapeHtml(plan.title)}</button></td>
-                  <td class="project-cell">${plan.project || "—"}</td>
+                  <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}">${highlightText(plan.title, searchQuery)}</button></td>
+                  <td class="project-cell">${plan.project ? highlightText(plan.project, searchQuery) : "—"}</td>
+                  <td class="num-cell">${formatSize(plan.size)}</td>
+                  <td class="num-cell">${plan.lineCount}</td>
                   <td class="meta-cell">${formatDate(plan.modified)}</td>
-                  <td class="meta-cell">${formatSize(plan.size)}</td>
-                  <td class="meta-cell">${plan.lineCount}</td>
+                  <td class="meta-cell">${formatDate(plan.created)}</td>
                 </tr>
               `
                 )
@@ -422,6 +501,7 @@ function render(): void {
         </div>
         <div class="modal-body">
           <div class="shortcut-row"><kbd>↑</kbd> <kbd>↓</kbd> <span>Navigate plans</span></div>
+          <div class="shortcut-row"><kbd>Enter</kbd> <span>Open in editor</span></div>
           <div class="shortcut-row"><kbd>⌘</kbd> <kbd>K</kbd> <span>Focus search</span></div>
           <div class="shortcut-row"><kbd>Esc</kbd> <span>Blur search / Close modal</span></div>
           <div class="shortcut-row"><kbd>?</kbd> <span>Toggle this help</span></div>
@@ -515,8 +595,7 @@ function attachEventListeners(): void {
       const filename = (row as HTMLElement).dataset.filename;
       const plan = filteredPlans.find((p) => p.filename === filename);
       if (plan) {
-        selectedPlan = plan;
-        render();
+        selectPlan(plan);
       }
     }
   });
@@ -576,10 +655,25 @@ function attachEventListeners(): void {
       const filename = (btn as HTMLButtonElement).dataset.filename;
       const plan = filteredPlans.find((p) => p.filename === filename);
       if (plan) {
-        selectedPlan = plan;
-        render();
+        selectPlan(plan);
       }
     });
+  });
+
+  // Refresh button handler
+  document.getElementById("refresh-btn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("refresh-btn");
+    if (btn) btn.classList.add("loading");
+    try {
+      const resp = await fetch("/api/plans");
+      plans = await resp.json();
+      filteredPlans = [...plans];
+      applyFilters();
+    } catch (err) {
+      console.error("Failed to refresh:", err);
+    } finally {
+      if (btn) btn.classList.remove("loading");
+    }
   });
 }
 
@@ -618,11 +712,19 @@ document.addEventListener("keydown", (e) => {
     if (newIdx < 0) newIdx = 0;
     if (newIdx >= filteredPlans.length) newIdx = filteredPlans.length - 1;
     if (filteredPlans[newIdx]) {
-      selectedPlan = filteredPlans[newIdx];
-      render();
+      selectPlan(filteredPlans[newIdx]);
       document
         .querySelector(`tr[data-filename="${filteredPlans[newIdx].filename}"]`)
         ?.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  // Enter to open in editor
+  if (e.key === "Enter" && selectedPlan) {
+    const activeEl = document.activeElement;
+    if (activeEl?.tagName !== "INPUT" && activeEl?.tagName !== "TEXTAREA" && activeEl?.tagName !== "BUTTON") {
+      e.preventDefault();
+      openInEditor();
     }
   }
 
@@ -631,7 +733,18 @@ document.addEventListener("keydown", (e) => {
       showHelpModal = false;
       render();
     } else {
-      (document.getElementById("search") as HTMLInputElement)?.blur();
+      const searchInput = document.getElementById("search") as HTMLInputElement;
+      if (document.activeElement === searchInput) {
+        if (searchQuery) {
+          // Clear search first
+          searchQuery = "";
+          searchInput.value = "";
+          applyFilters();
+        } else {
+          // Already empty, blur
+          searchInput.blur();
+        }
+      }
     }
   }
 
@@ -646,6 +759,22 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// Handle browser back/forward
+window.addEventListener("popstate", () => {
+  const url = new URL(window.location.href);
+  const planFilename = url.searchParams.get("plan");
+  if (planFilename) {
+    const plan = plans.find((p) => p.filename === planFilename);
+    if (plan && plan !== selectedPlan) {
+      selectedPlan = plan;
+      render();
+    }
+  } else if (selectedPlan) {
+    selectedPlan = null;
+    render();
+  }
+});
+
 // Initial load
 async function init(): Promise<void> {
   app.innerHTML = '<div class="loading">Loading plans...</div>';
@@ -654,6 +783,17 @@ async function init(): Promise<void> {
     const res = await fetch("/api/plans");
     plans = await res.json();
     filteredPlans = [...plans];
+
+    // Check URL for initial plan selection
+    const url = new URL(window.location.href);
+    const planFilename = url.searchParams.get("plan");
+    if (planFilename) {
+      const plan = plans.find((p) => p.filename === planFilename);
+      if (plan) {
+        selectedPlan = plan;
+      }
+    }
+
     render();
   } catch (err) {
     app.innerHTML = `<div class="empty-state"><p>Failed to load plans</p><p class="hint">${err}</p></div>`;

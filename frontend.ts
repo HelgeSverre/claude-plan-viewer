@@ -344,6 +344,7 @@ function updateTableAndStats(): void {
     tbody.innerHTML = filteredPlans.map((plan) => `
       <tr data-filename="${plan.filename}" class="${selectedPlan?.filename === plan.filename ? "selected" : ""}">
         <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}">${highlightText(plan.title, searchQuery)}</button></td>
+        <td class="filename-cell">${highlightText(plan.filename, searchQuery)}</td>
         <td class="project-cell">${plan.project ? highlightText(plan.project, searchQuery) : "—"}</td>
         <td class="num-cell">${formatSize(plan.size)}</td>
         <td class="num-cell">${plan.lineCount}</td>
@@ -429,6 +430,7 @@ function render(): void {
                 <th data-sort="title" class="${sortKey === "title" ? "sorted " + sortDir : ""}">
                   Title <span class="sort-icon">▲</span>
                 </th>
+                <th class="no-sort">Filename</th>
                 <th data-sort="project" class="${sortKey === "project" ? "sorted " + sortDir : ""}">
                   Project <span class="sort-icon">▲</span>
                 </th>
@@ -452,6 +454,7 @@ function render(): void {
                   (plan) => `
                 <tr data-filename="${plan.filename}" class="${selectedPlan?.filename === plan.filename ? "selected" : ""}">
                   <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}">${highlightText(plan.title, searchQuery)}</button></td>
+                  <td class="filename-cell">${highlightText(plan.filename, searchQuery)}</td>
                   <td class="project-cell">${plan.project ? highlightText(plan.project, searchQuery) : "—"}</td>
                   <td class="num-cell">${formatSize(plan.size)}</td>
                   <td class="num-cell">${plan.lineCount}</td>

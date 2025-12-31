@@ -457,6 +457,14 @@ th.sorted.desc .sort-icon {
   transform: rotate(180deg);
 }
 
+th.no-sort {
+  cursor: default;
+}
+
+th.no-sort:hover {
+  color: var(--text-secondary);
+}
+
 td {
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
@@ -521,6 +529,13 @@ tr.selected .title-btn {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 11px;
   max-width: 140px;
+}
+
+.filename-cell {
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  max-width: 180px;
 }
 
 .meta-cell {

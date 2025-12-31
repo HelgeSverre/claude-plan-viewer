@@ -29,10 +29,19 @@ let sortKey = "modified";
 let sortDir: "asc" | "desc" = "desc";
 let searchQuery = "";
 let showHelpModal = false;
+let showDetailOverlay = false;
 let selectedProjects: Set<string> = new Set();
 const scrollPositions = new Map<string, number>();
 
 const app = document.getElementById("app")!;
+
+function setDetailOverlayOpen(open: boolean): void {
+  showDetailOverlay = open;
+  const overlay = document.getElementById("detail-overlay");
+  if (!overlay) return;
+  overlay.classList.toggle("is-open", open);
+  overlay.setAttribute("aria-hidden", open ? "false" : "true");
+}
 
 function selectPlan(plan: Plan | null): void {
   // Save scroll position of current plan
@@ -44,6 +53,7 @@ function selectPlan(plan: Plan | null): void {
   }
 
   selectedPlan = plan;
+  showDetailOverlay = false;
 
   // Update URL
   if (plan) {
@@ -343,7 +353,7 @@ function updateTableAndStats(): void {
   if (tbody) {
     tbody.innerHTML = filteredPlans.map((plan) => `
       <tr data-filename="${plan.filename}" class="${selectedPlan?.filename === plan.filename ? "selected" : ""}">
-        <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}">${highlightText(plan.title, searchQuery)}</button></td>
+         <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}" title="${escapeHtml(plan.title)}">${highlightText(plan.title, searchQuery)}</button></td>
         <td class="filename-cell">${highlightText(plan.filename, searchQuery)}</td>
         <td class="project-cell">${plan.project ? highlightText(plan.project, searchQuery) : "—"}</td>
         <td class="num-cell">${formatSize(plan.size)}</td>
@@ -368,10 +378,10 @@ function render(): void {
         <div class="header">
           <div class="header-row">
             <h1>
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
               </svg>
-              Plans
+              Claude Plan Viewer
             </h1>
             <div class="header-spacer"></div>
             <select class="sort-select" id="sort">
@@ -486,6 +496,11 @@ function render(): void {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
                 </button>
+                <button class="action-btn" id="overlay-btn" title="Show fullscreen">
+                  <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+                  </svg>
+                </button>
                 <button class="action-btn" id="open-editor-btn" title="Open in editor">
                   <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -530,6 +545,26 @@ function render(): void {
           <div class="shortcut-row"><kbd>⌘</kbd> <kbd>K</kbd> <span>Focus search</span></div>
           <div class="shortcut-row"><kbd>Esc</kbd> <span>Blur search / Close modal</span></div>
           <div class="shortcut-row"><kbd>?</kbd> <span>Toggle this help</span></div>
+        </div>
+      </div>
+    </div>
+    ` : ''}
+    ${selectedPlan ? `
+    <div class="detail-overlay${showDetailOverlay ? " is-open" : ""}" id="detail-overlay" aria-hidden="${showDetailOverlay ? "false" : "true"}">
+      <div class="detail-overlay-panel">
+        <div class="detail-overlay-header">
+          <div class="detail-overlay-title">${escapeHtml(selectedPlan.title)}</div>
+          <button class="modal-close" id="close-overlay" title="Close fullscreen">&times;</button>
+        </div>
+        <div class="detail-meta detail-overlay-meta">
+          ${selectedPlan.project ? `<span class="project-tag">${selectedPlan.project}</span>` : ""}
+          <span>${selectedPlan.filename}</span>
+          <span>${formatFullDate(selectedPlan.modified)}</span>
+          <span>${formatSize(selectedPlan.size)}</span>
+          <span>${selectedPlan.lineCount} lines</span>
+        </div>
+        <div class="detail-overlay-content">
+          <div class="markdown">${renderMarkdown(selectedPlan.content)}</div>
         </div>
       </div>
     </div>
@@ -676,6 +711,21 @@ function attachEventListeners(): void {
     }
   });
 
+  document.getElementById("overlay-btn")?.addEventListener("click", () => {
+    setDetailOverlayOpen(true);
+  });
+
+  document.getElementById("close-overlay")?.addEventListener("click", () => {
+    setDetailOverlayOpen(false);
+  });
+
+  const detailOverlay = document.getElementById("detail-overlay");
+  detailOverlay?.addEventListener("click", (e) => {
+    if (showDetailOverlay && e.target === detailOverlay) {
+      setDetailOverlayOpen(false);
+    }
+  });
+
   // Title button click handler for keyboard accessibility
   document.querySelectorAll(".title-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -758,7 +808,9 @@ document.addEventListener("keydown", (e) => {
   }
 
   if (e.key === "Escape") {
-    if (showHelpModal) {
+    if (showDetailOverlay) {
+      setDetailOverlayOpen(false);
+    } else if (showHelpModal) {
       showHelpModal = false;
       render();
     } else {
@@ -785,6 +837,14 @@ document.addEventListener("keydown", (e) => {
       e.preventDefault();
       showHelpModal = !showHelpModal;
       render();
+    }
+  }
+
+  if (e.key === "f" && selectedPlan && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    const activeEl = document.activeElement;
+    if (activeEl?.tagName !== "INPUT" && activeEl?.tagName !== "TEXTAREA") {
+      e.preventDefault();
+      setDetailOverlayOpen(!showDetailOverlay);
     }
   }
 });

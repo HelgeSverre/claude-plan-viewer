@@ -13,7 +13,7 @@ interface Plan {
   filename: string;
   filepath: string;
   title: string;
-  content: string;
+  content?: string; // Lazy-loaded on demand
   size: number;
   modified: string;
   created: string;
@@ -33,6 +33,32 @@ let showDetailOverlay = false;
 let selectedProjects: Set<string> = new Set();
 const scrollPositions = new Map<string, number>();
 
+// Pagination state
+let totalPlans = 0;
+let offset = 0;
+let limit = 100;
+let isLoadingMore = false;
+let pendingOffset: number | null = null;
+let rowHeight = 40; // estimated, will be measured
+let abortController: AbortController | null = null;
+let preemptiveAbortController: AbortController | null = null;
+let highestIndexLoaded = -1; // Track highest index we've loaded to avoid duplicates
+
+// Helper to sync state to window for testing
+function syncStateToWindow(): void {
+  if (typeof window !== "undefined") {
+    (window as any).plans = plans;
+    (window as any).filteredPlans = filteredPlans;
+    (window as any).selectedPlan = selectedPlan;
+    (window as any).totalPlans = totalPlans;
+    (window as any).offset = offset;
+    (window as any).searchQuery = searchQuery;
+  }
+}
+
+// Initial sync
+syncStateToWindow();
+
 const app = document.getElementById("app")!;
 
 function setDetailOverlayOpen(open: boolean): void {
@@ -43,34 +69,112 @@ function setDetailOverlayOpen(open: boolean): void {
   overlay.setAttribute("aria-hidden", open ? "false" : "true");
 }
 
-function selectPlan(plan: Plan | null): void {
-  // Save scroll position of current plan
-  if (selectedPlan) {
-    const detailContent = document.querySelector(".detail-content");
-    if (detailContent) {
-      scrollPositions.set(selectedPlan.filename, detailContent.scrollTop);
+function updateDetailOverlayContent(): void {
+  if (!selectedPlan) return;
+  
+  const overlayContent = document.querySelector(".detail-overlay-content");
+  if (!overlayContent) return;
+  
+  overlayContent.innerHTML = `<div class="markdown">${selectedPlan.content ? renderMarkdown(selectedPlan.content) : '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Loading content...</div>'}</div>`;
+}
+
+function updateDetailPanel(): void {
+  const detailPanel = document.getElementById("detail-panel");
+  if (!detailPanel) {
+    render();
+    return;
+  }
+
+  if (!selectedPlan) {
+    detailPanel.innerHTML = `
+      <div class="empty-state" style="padding: 2rem;">
+        <p>Select a plan to view details</p>
+      </div>
+    `;
+    return;
+  }
+
+  detailPanel.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-header-top">
+        <div class="detail-title">${escapeHtml(selectedPlan.title)}</div>
+        <div class="detail-actions">
+          <button class="action-btn" id="copy-btn" title="Copy markdown">
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+          <button class="action-btn" id="copy-path-btn" title="Copy file path">
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+          </button>
+          <button class="action-btn" id="overlay-btn" title="Show fullscreen">
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+            </svg>
+          </button>
+          <button class="action-btn" id="open-editor-btn" title="Open in editor">
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="detail-meta">
+        ${selectedPlan.project ? `<span class="project-tag">${escapeHtml(selectedPlan.project)}</span>` : ""}
+        <span>${escapeHtml(selectedPlan.filename)}</span>
+        <span>${formatFullDate(selectedPlan.modified)}</span>
+        <span>${formatSize(selectedPlan.size)}</span>
+        <span>${selectedPlan.lineCount} lines</span>
+      </div>
+    </div>
+    <div class="detail-content">
+      <div class="markdown">${selectedPlan.content ? renderMarkdown(selectedPlan.content) : '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Loading content...</div>'}</div>
+    </div>
+  `;
+
+  // Re-attach detail panel event listeners
+  document.getElementById("overlay-btn")?.addEventListener("click", () => {
+    setDetailOverlayOpen(true);
+  });
+
+  document.getElementById("copy-btn")?.addEventListener("click", async () => {
+    if (!selectedPlan) return;
+    try {
+      await navigator.clipboard.writeText(selectedPlan.content);
+      showCopiedFeedback("copy-btn");
+    } catch (err) {
+      console.error("Failed to copy:", err);
     }
-  }
+  });
 
-  selectedPlan = plan;
-  showDetailOverlay = false;
+  document.getElementById("copy-path-btn")?.addEventListener("click", async () => {
+    if (!selectedPlan) return;
+    try {
+      await navigator.clipboard.writeText(selectedPlan.filepath);
+      showCopiedFeedback("copy-path-btn");
+    } catch (err) {
+      console.error("Failed to copy path:", err);
+    }
+  });
 
-  // Update URL
-  if (plan) {
-    const url = new URL(window.location.href);
-    url.searchParams.set("plan", plan.filename);
-    history.pushState(null, "", url.toString());
-  } else {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("plan");
-    history.pushState(null, "", url.toString());
-  }
-
-  render();
+  document.getElementById("open-editor-btn")?.addEventListener("click", async () => {
+    if (!selectedPlan) return;
+    try {
+      await fetch("/api/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filepath: selectedPlan.filepath }),
+      });
+    } catch (err) {
+      console.error("Failed to open in editor:", err);
+    }
+  });
 
   // Restore scroll position
-  if (plan) {
-    const savedScroll = scrollPositions.get(plan.filename);
+  if (selectedPlan) {
+    const savedScroll = scrollPositions.get(selectedPlan.filename);
     if (savedScroll !== undefined) {
       requestAnimationFrame(() => {
         const detailContent = document.querySelector(".detail-content");
@@ -81,6 +185,68 @@ function selectPlan(plan: Plan | null): void {
     }
   }
 }
+
+// Lazy-load content for a plan if not already loaded
+async function ensurePlanContent(plan: Plan): Promise<void> {
+  if (plan.content) return; // Already loaded
+
+  try {
+    const res = await fetch(`/api/plans/${encodeURIComponent(plan.filename)}/content`);
+    if (!res.ok) {
+      return;
+    }
+    const data = await res.json();
+    plan.content = data.content;
+    
+    // Update both detail panel and overlay if visible
+    updateDetailPanel();
+    if (showDetailOverlay) {
+      updateDetailOverlayContent();
+    }
+  } catch (err) {
+    console.error("Failed to load plan content:", err);
+  }
+}
+
+function selectPlan(plan: Plan | null): void {
+   
+   if (showDetailOverlay) {
+     setDetailOverlayOpen(false);
+   }
+   // Save scroll position of current plan
+   if (selectedPlan) {
+     const detailContent = document.querySelector(".detail-content");
+     if (detailContent) {
+       scrollPositions.set(selectedPlan.filename, detailContent.scrollTop);
+     }
+   }
+
+   selectedPlan = plan;
+   showDetailOverlay = false;
+   syncStateToWindow();
+
+  // Update URL
+  if (plan) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("plan", plan.filename);
+    history.pushState(null, "", url.toString());
+    
+    // Lazy-load content
+    ensurePlanContent(plan).then(() => updateDetailPanel());
+  } else {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("plan");
+    history.pushState(null, "", url.toString());
+  }
+
+  // Always render the full page to show overlay option (which calls attachEventListeners)
+   render();
+   
+   // Content will be loaded asynchronously and detail panel will be updated separately
+   if (plan && !plan.content) {
+     ensurePlanContent(plan).then(() => updateDetailPanel());
+   }
+  }
 
 async function openInEditor(): Promise<void> {
   if (!selectedPlan) return;
@@ -155,6 +321,14 @@ function formatFullDate(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatDateISO(iso: string): string {
+  const d = new Date(iso);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatSize(bytes: number): string {
@@ -292,26 +466,60 @@ function renderMarkdown(content: string): string {
 }
 
 function applyFilters(): void {
-  const query = searchQuery.toLowerCase();
-  filteredPlans = plans.filter((p) => {
-    // Apply project filter (empty set = show all)
-    if (selectedProjects.size > 0 && (!p.project || !selectedProjects.has(p.project))) {
-      return false;
-    }
-    // Apply search filter
-    if (query) {
-      return (
-        p.title.toLowerCase().includes(query) ||
-        p.content.toLowerCase().includes(query) ||
-        p.filename.toLowerCase().includes(query) ||
-        (p.project && p.project.toLowerCase().includes(query))
-      );
-    }
-    return true;
-  });
-  sortPlans();
-  render();
-}
+   const query = searchQuery.toLowerCase();
+   filteredPlans = plans.filter((p) => {
+     // Apply project filter (empty set = show all)
+     if (selectedProjects.size > 0 && (!p.project || !selectedProjects.has(p.project))) {
+       return false;
+     }
+     // Apply search filter
+     if (query) {
+       const content = p.content ?? "";
+       return (
+         p.title.toLowerCase().includes(query) ||
+         content.toLowerCase().includes(query) ||
+         p.filename.toLowerCase().includes(query) ||
+         (p.project && p.project.toLowerCase().includes(query))
+       );
+     }
+     return true;
+   });
+   sortPlans();
+   
+   // Reset pagination on filter change
+   offset = 0;
+   pendingOffset = null;
+   highestIndexLoaded = -1; // Reset when filters change
+   
+   syncStateToWindow();
+   render();
+ }
+
+function updateFilters(): void {
+   const query = searchQuery.toLowerCase();
+   filteredPlans = plans.filter((p) => {
+     // Apply project filter (empty set = show all)
+     if (selectedProjects.size > 0 && (!p.project || !selectedProjects.has(p.project))) {
+       return false;
+     }
+     // Apply search filter
+     if (query) {
+       const content = p.content ?? "";
+       return (
+         p.title.toLowerCase().includes(query) ||
+         content.toLowerCase().includes(query) ||
+         p.filename.toLowerCase().includes(query) ||
+         (p.project && p.project.toLowerCase().includes(query))
+       );
+     }
+     return true;
+   });
+   sortPlans();
+   
+   // Don't reset pagination - just update the filtered results
+   syncStateToWindow();
+   render();
+ }
 
 function getProjectTriggerText(projects: string[]): string {
   if (selectedProjects.size === 0) {
@@ -348,25 +556,26 @@ function updateTableAndStats(): void {
     trigger.innerHTML = getProjectTriggerText(projects) + chevronHtml;
   }
 
-  // Update table
+  // Update table - only show items up to offset+limit (pagination)
+  const paginatedPlans = filteredPlans.slice(0, offset + limit);
   const tbody = document.getElementById("plans-table");
   if (tbody) {
-    tbody.innerHTML = filteredPlans.map((plan) => `
+    tbody.innerHTML = paginatedPlans.map((plan) => `
       <tr data-filename="${plan.filename}" class="${selectedPlan?.filename === plan.filename ? "selected" : ""}">
-         <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}" title="${escapeHtml(plan.title)}">${highlightText(plan.title, searchQuery)}</button></td>
+        <td class="date-cell">${formatDateISO(plan.created)}</td>
+        <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}" title="${escapeHtml(plan.title)}">${highlightText(plan.title, searchQuery)}</button></td>
         <td class="filename-cell">${highlightText(plan.filename, searchQuery)}</td>
         <td class="project-cell">${plan.project ? highlightText(plan.project, searchQuery) : "—"}</td>
         <td class="num-cell">${formatSize(plan.size)}</td>
         <td class="num-cell">${plan.lineCount}</td>
         <td class="meta-cell">${formatDate(plan.modified)}</td>
-        <td class="meta-cell">${formatDate(plan.created)}</td>
       </tr>
     `).join("");
   }
 }
 
 function render(): void {
-  const totalSize = filteredPlans.reduce((sum, p) => sum + p.size, 0);
+   const totalSize = filteredPlans.reduce((sum, p) => sum + p.size, 0);
 
   // Get unique projects for filter chips
   const projects = [...new Set(plans.map(p => p.project).filter(Boolean))] as string[];
@@ -384,30 +593,41 @@ function render(): void {
               Claude Plan Viewer
             </h1>
             <div class="header-spacer"></div>
-            <select class="sort-select" id="sort">
-              <option value="modified-desc" ${sortKey === "modified" && sortDir === "desc" ? "selected" : ""}>Modified (newest)</option>
-              <option value="modified-asc" ${sortKey === "modified" && sortDir === "asc" ? "selected" : ""}>Modified (oldest)</option>
-              <option value="project-asc" ${sortKey === "project" && sortDir === "asc" ? "selected" : ""}>Project (A-Z)</option>
-              <option value="project-desc" ${sortKey === "project" && sortDir === "desc" ? "selected" : ""}>Project (Z-A)</option>
-              <option value="title-asc" ${sortKey === "title" && sortDir === "asc" ? "selected" : ""}>Title (A-Z)</option>
-              <option value="title-desc" ${sortKey === "title" && sortDir === "desc" ? "selected" : ""}>Title (Z-A)</option>
-              <option value="size-desc" ${sortKey === "size" && sortDir === "desc" ? "selected" : ""}>Size (largest)</option>
-              <option value="size-asc" ${sortKey === "size" && sortDir === "asc" ? "selected" : ""}>Size (smallest)</option>
-              <option value="lines-desc" ${sortKey === "lines" && sortDir === "desc" ? "selected" : ""}>Lines (most)</option>
-              <option value="lines-asc" ${sortKey === "lines" && sortDir === "asc" ? "selected" : ""}>Lines (least)</option>
-              <option value="created-desc" ${sortKey === "created" && sortDir === "desc" ? "selected" : ""}>Created (newest)</option>
-              <option value="created-asc" ${sortKey === "created" && sortDir === "asc" ? "selected" : ""}>Created (oldest)</option>
-            </select>
             <div class="search-wrapper">
               <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <input type="search" class="search-input" id="search" placeholder="Search..." value="${escapeHtml(searchQuery)}" autofocus>
+              <input type="search" class="search-input" id="search" placeholder="Search..." value="${escapeHtml(searchQuery)}">
               <span class="search-kbd">⌘K</span>
+            </div>
+            <div class="sort-dropdown">
+              <button class="dropdown-trigger" id="sort-trigger">
+                ${sortKey === "modified" ? (sortDir === "desc" ? "Modified (newest)" : "Modified (oldest)") : 
+                  sortKey === "project" ? (sortDir === "asc" ? "Project (A-Z)" : "Project (Z-A)") :
+                  sortKey === "title" ? (sortDir === "asc" ? "Title (A-Z)" : "Title (Z-A)") :
+                  sortKey === "size" ? (sortDir === "desc" ? "Size (largest)" : "Size (smallest)") :
+                  sortKey === "lines" ? (sortDir === "desc" ? "Lines (most)" : "Lines (least)") :
+                  sortKey === "created" ? (sortDir === "desc" ? "Created (newest)" : "Created (oldest)") : "Modified (newest)"}
+                <svg class="chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              <div id="sort-menu" popover class="dropdown-menu">
+                <button class="dropdown-item" data-sort="modified-desc">Modified (newest)</button>
+                <button class="dropdown-item" data-sort="modified-asc">Modified (oldest)</button>
+                <button class="dropdown-item" data-sort="project-asc">Project (A-Z)</button>
+                <button class="dropdown-item" data-sort="project-desc">Project (Z-A)</button>
+                <button class="dropdown-item" data-sort="title-asc">Title (A-Z)</button>
+                <button class="dropdown-item" data-sort="title-desc">Title (Z-A)</button>
+                <button class="dropdown-item" data-sort="size-desc">Size (largest)</button>
+                <button class="dropdown-item" data-sort="size-asc">Size (smallest)</button>
+                <button class="dropdown-item" data-sort="lines-desc">Lines (most)</button>
+                <button class="dropdown-item" data-sort="lines-asc">Lines (least)</button>
+                <button class="dropdown-item" data-sort="created-desc">Created (newest)</button>
+                <button class="dropdown-item" data-sort="created-asc">Created (oldest)</button>
+              </div>
             </div>
             ${projects.length > 0 ? `
             <div class="project-dropdown">
-              <button class="dropdown-trigger ${selectedProjects.size > 0 ? 'has-selection' : ''}" id="project-trigger" popovertarget="project-menu">
+              <button class="dropdown-trigger ${selectedProjects.size > 0 ? 'has-selection' : ''}" id="project-trigger">
                 ${getProjectTriggerText(projects)}
                 <svg class="chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -437,6 +657,9 @@ function render(): void {
           <table>
             <thead>
               <tr>
+                <th data-sort="created" class="date-col ${sortKey === "created" ? "sorted " + sortDir : ""}">
+                  Date <span class="sort-icon">▲</span>
+                </th>
                 <th data-sort="title" class="${sortKey === "title" ? "sorted " + sortDir : ""}">
                   Title <span class="sort-icon">▲</span>
                 </th>
@@ -453,9 +676,6 @@ function render(): void {
                 <th data-sort="modified" class="${sortKey === "modified" ? "sorted " + sortDir : ""}">
                   Modified <span class="sort-icon">▲</span>
                 </th>
-                <th data-sort="created" class="${sortKey === "created" ? "sorted " + sortDir : ""}">
-                  Created <span class="sort-icon">▲</span>
-                </th>
               </tr>
             </thead>
             <tbody id="plans-table">
@@ -463,22 +683,24 @@ function render(): void {
                 .map(
                   (plan) => `
                 <tr data-filename="${plan.filename}" class="${selectedPlan?.filename === plan.filename ? "selected" : ""}">
+                  <td class="date-cell">${formatDateISO(plan.created)}</td>
                   <td class="title-cell"><button class="title-btn" data-filename="${plan.filename}">${highlightText(plan.title, searchQuery)}</button></td>
                   <td class="filename-cell">${highlightText(plan.filename, searchQuery)}</td>
                   <td class="project-cell">${plan.project ? highlightText(plan.project, searchQuery) : "—"}</td>
                   <td class="num-cell">${formatSize(plan.size)}</td>
                   <td class="num-cell">${plan.lineCount}</td>
                   <td class="meta-cell">${formatDate(plan.modified)}</td>
-                  <td class="meta-cell">${formatDate(plan.created)}</td>
                 </tr>
               `
                 )
                 .join("")}
             </tbody>
-          </table>
-        </div>
-      </div>
-      <div class="detail-panel">
+            </table>
+            <div id="scroll-sentinel" style="height: 1px; visibility: hidden;"></div>
+            ${offset + limit < totalPlans ? `<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Loading more...</div>` : offset > 0 ? `<div style="padding: 20px; text-align: center; color: var(--text-secondary); font-size: 0.9em;">End of list (${totalPlans} total)</div>` : ''}
+            </div>
+            </div>
+      <div class="detail-panel" id="detail-panel">
         ${
           selectedPlan
             ? `
@@ -517,7 +739,7 @@ function render(): void {
             </div>
           </div>
           <div class="detail-content">
-            <div class="markdown">${renderMarkdown(selectedPlan.content)}</div>
+            <div class="markdown">${selectedPlan.content ? renderMarkdown(selectedPlan.content) : '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Loading content...</div>'}</div>
           </div>
         `
             : `
@@ -552,33 +774,48 @@ function render(): void {
     ${selectedPlan ? `
     <div class="detail-overlay${showDetailOverlay ? " is-open" : ""}" id="detail-overlay" aria-hidden="${showDetailOverlay ? "false" : "true"}">
       <div class="detail-overlay-panel">
-        <div class="detail-overlay-header">
-          <div class="detail-overlay-title">${escapeHtml(selectedPlan.title)}</div>
+        <div class="detail-overlay-bar">
+          <div class="detail-meta detail-overlay-meta">
+            ${selectedPlan.project ? `<span class="project-tag">${selectedPlan.project}</span>` : ""}
+            <span>${selectedPlan.filename}</span>
+            <span>${formatFullDate(selectedPlan.modified)}</span>
+            <span>${formatSize(selectedPlan.size)}</span>
+            <span>${selectedPlan.lineCount} lines</span>
+          </div>
           <button class="modal-close" id="close-overlay" title="Close fullscreen">&times;</button>
         </div>
-        <div class="detail-meta detail-overlay-meta">
-          ${selectedPlan.project ? `<span class="project-tag">${selectedPlan.project}</span>` : ""}
-          <span>${selectedPlan.filename}</span>
-          <span>${formatFullDate(selectedPlan.modified)}</span>
-          <span>${formatSize(selectedPlan.size)}</span>
-          <span>${selectedPlan.lineCount} lines</span>
-        </div>
         <div class="detail-overlay-content">
-          <div class="markdown">${renderMarkdown(selectedPlan.content)}</div>
+          <div class="markdown">${selectedPlan.content ? renderMarkdown(selectedPlan.content) : '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Loading content...</div>'}</div>
         </div>
       </div>
     </div>
     ` : ''}
-  `;
+    `;
+    
+    // Attach event listeners for the newly rendered HTML
+    attachEventListeners();
+    }
 
-  attachEventListeners();
+function onTableRowClick(e: Event): void {
+  const target = e.target as HTMLElement;
+  const row = target.closest("tr[data-filename]");
+  if (!row) return;
+  
+  const filename = row.getAttribute("data-filename");
+  if (!filename) return;
+  
+  const plan = filteredPlans.find((p) => p.filename === filename);
+  if (plan) {
+    selectPlan(plan);
+  }
 }
 
 function attachEventListeners(): void {
-  const searchInput = document.getElementById("search") as HTMLInputElement;
-  const sortSelect = document.getElementById("sort") as HTMLSelectElement;
-  const tbody = document.getElementById("plans-table")!;
+   const searchInput = document.getElementById("search") as HTMLInputElement;
+   const tbody = document.getElementById("plans-table")!;
   const ths = document.querySelectorAll("th[data-sort]");
+  const sortMenu = document.getElementById("sort-menu") as HTMLElement | null;
+  const sortTrigger = document.getElementById("sort-trigger") as HTMLElement | null;
 
   searchInput?.addEventListener("input", (e) => {
     searchQuery = (e.target as HTMLInputElement).value;
@@ -592,6 +829,14 @@ function attachEventListeners(): void {
 
   // Project dropdown handlers
   const projectMenu = document.getElementById("project-menu") as HTMLElement | null;
+  const projectTrigger = document.getElementById("project-trigger") as HTMLElement | null;
+  
+  projectTrigger?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // Close sort menu if open
+    sortMenu?.hidePopover?.();
+  });
+
   projectMenu?.addEventListener("change", (e) => {
     const checkbox = e.target as HTMLInputElement;
     if (checkbox.type === "checkbox") {
@@ -607,9 +852,10 @@ function attachEventListeners(): void {
           return false;
         }
         if (query) {
+          const content = p.content ?? "";
           return (
             p.title.toLowerCase().includes(query) ||
-            p.content.toLowerCase().includes(query) ||
+            content.toLowerCase().includes(query) ||
             p.filename.toLowerCase().includes(query) ||
             (p.project && p.project.toLowerCase().includes(query))
           );
@@ -628,14 +874,35 @@ function attachEventListeners(): void {
     applyFilters();
   });
 
-  sortSelect?.addEventListener("change", (e) => {
-    const parts = (e.target as HTMLSelectElement).value.split("-");
-    const key = parts[0] ?? "modified";
-    const dir = parts[1] ?? "desc";
-    sortKey = key;
-    sortDir = dir as "asc" | "desc";
-    sortPlans();
-    render();
+  // Sort dropdown handlers
+  sortTrigger?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // Close project menu if open
+    projectMenu?.hidePopover?.();
+    // Toggle sort menu
+    if (sortMenu?.matches(":popover-open")) {
+      sortMenu?.hidePopover?.();
+    } else {
+      sortMenu?.showPopover?.();
+    }
+  });
+
+  sortMenu?.addEventListener("click", (e) => {
+    const button = (e.target as HTMLElement).closest("button[data-sort]");
+    if (button) {
+      const sortValue = button.getAttribute("data-sort");
+      if (sortValue) {
+        const parts = sortValue.split("-");
+        const key = parts[0] ?? "modified";
+        const dir = parts[1] ?? "desc";
+        sortKey = key;
+        sortDir = dir as "asc" | "desc";
+        sortPlans();
+        // Close popover and render
+        sortMenu?.hidePopover?.();
+        render();
+      }
+    }
   });
 
   ths.forEach((th) => {
@@ -652,14 +919,11 @@ function attachEventListeners(): void {
     });
   });
 
-  tbody?.addEventListener("click", (e) => {
-    const row = (e.target as HTMLElement).closest("tr");
-    if (row) {
-      const filename = (row as HTMLElement).dataset.filename;
-      const plan = filteredPlans.find((p) => p.filename === filename);
-      if (plan) {
-        selectPlan(plan);
-      }
+  // Use document-level delegation for table rows (survives DOM rebuilds)
+  document.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("#plans-table")) {
+      onTableRowClick(e);
     }
   });
 
@@ -712,7 +976,7 @@ function attachEventListeners(): void {
   });
 
   document.getElementById("overlay-btn")?.addEventListener("click", () => {
-    setDetailOverlayOpen(true);
+    setDetailOverlayOpen(!showDetailOverlay);
   });
 
   document.getElementById("close-overlay")?.addEventListener("click", () => {
@@ -743,8 +1007,11 @@ function attachEventListeners(): void {
     const btn = document.getElementById("refresh-btn");
     if (btn) btn.classList.add("loading");
     try {
-      const resp = await fetch("/api/plans");
-      plans = await resp.json();
+      const resp = await fetch("/api/plans?offset=0&limit=10000");
+      const data = await resp.json();
+      plans = data.plans;
+      totalPlans = data.total;
+      offset = 0;
       filteredPlans = [...plans];
       applyFilters();
     } catch (err) {
@@ -865,32 +1132,223 @@ window.addEventListener("popstate", () => {
   }
 });
 
-// Initial load
-async function init(): Promise<void> {
-  app.innerHTML = '<div class="loading">Loading plans...</div>';
+// Calculate limit based on viewport height
+function calculateLimit(): number {
+  const viewportHeight = window.innerHeight;
+  const headerHeight = 200; // approximate header + filters
+  const availableHeight = Math.max(viewportHeight - headerHeight, 300);
+  const calculated = Math.ceil(availableHeight / rowHeight) + 10;
+  return Math.max(calculated, 80);
+}
+
+// Fetch more plans
+// Preemptively load next batch in the background
+async function preemptivelyLoadPlans(nextOffset: number): Promise<void> {
+  if (nextOffset >= totalPlans) return;
+  if (nextOffset <= highestIndexLoaded) return; // Already have this data
+  if (plans.length >= nextOffset + 200) return; // Already have enough cached
+
+  // Cancel previous preemptive request
+  if (preemptiveAbortController) {
+    preemptiveAbortController.abort();
+  }
+
+  preemptiveAbortController = new AbortController();
 
   try {
-    const res = await fetch("/api/plans");
-    plans = await res.json();
-    filteredPlans = [...plans];
-
-    // Check URL for initial state
-    const url = new URL(window.location.href);
-
-    // Load search query from URL
-    const queryParam = url.searchParams.get("q");
-    if (queryParam) {
-      searchQuery = queryParam;
+    const res = await fetch(`/api/plans?offset=${nextOffset}&limit=200`, {
+      signal: preemptiveAbortController.signal,
+    });
+    const data = await res.json();
+    
+    // Append if we don't have them yet, filtering out duplicates
+    const existingFilenames = new Set(plans.map(p => p.filename));
+    const newPlans = data.plans.filter(p => !existingFilenames.has(p.filename));
+    
+    if (newPlans.length > 0) {
+      plans.push(...newPlans);
+      // Update highest index loaded
+      const newHighest = nextOffset + newPlans.length - 1;
+      if (newHighest > highestIndexLoaded) {
+        highestIndexLoaded = newHighest;
+      }
+      syncStateToWindow();
     }
+  } catch (err) {
+    // Silently fail - preemptive loading is non-critical
+  } finally {
+    preemptiveAbortController = null;
+  }
+}
 
-    // Load plan selection from URL
-    const planFilename = url.searchParams.get("plan");
-    if (planFilename) {
-      const plan = plans.find((p) => p.filename === planFilename);
-      if (plan) {
-        selectedPlan = plan;
+async function fetchMorePlans(nextOffset: number): Promise<void> {
+   if (isLoadingMore) return;
+   if (nextOffset >= totalPlans) return; // Already at end
+
+   // Cancel previous request if still pending
+   if (abortController) {
+     abortController.abort();
+   }
+
+  isLoadingMore = true;
+  pendingOffset = nextOffset;
+  abortController = new AbortController();
+
+  try {
+    const res = await fetch(`/api/plans?offset=${nextOffset}&limit=${limit}`, {
+      signal: abortController.signal,
+    });
+    const data = await res.json();
+    
+    // Append new plans - but check for duplicates first
+    const existingFilenames = new Set(plans.map(p => p.filename));
+    const newPlans = data.plans.filter(p => !existingFilenames.has(p.filename));
+    
+    plans.push(...newPlans);
+    totalPlans = data.total;
+    offset = nextOffset;
+    pendingOffset = null;
+    
+    // Update highest index loaded
+    const newHighest = nextOffset + newPlans.length - 1;
+    if (newHighest > highestIndexLoaded) {
+      highestIndexLoaded = newHighest;
+    }
+    
+    syncStateToWindow();
+    
+    // Save scroll position before render
+    const tableContainer = document.querySelector(".table-container") as HTMLElement | null;
+    const scrollPos = tableContainer?.scrollTop ?? 0;
+    
+    // Use updateFilters to avoid resetting offset
+    updateFilters();
+    
+    // Restore scroll position after render
+    requestAnimationFrame(() => {
+      const newTableContainer = document.querySelector(".table-container") as HTMLElement | null;
+      if (newTableContainer) {
+        newTableContainer.scrollTop = scrollPos;
+      }
+      setupInfiniteScroll();
+      // Preemptively load next batch
+      const nextNextOffset = offset + limit + limit;
+      preemptivelyLoadPlans(nextNextOffset);
+    });
+  } catch (err) {
+    if (!(err instanceof Error && err.name === "AbortError")) {
+      console.error("Failed to fetch more plans:", err);
+    }
+    pendingOffset = null;
+  } finally {
+    isLoadingMore = false;
+    abortController = null;
+  }
+}
+
+// Setup IntersectionObserver for infinite scroll
+function setupInfiniteScroll(): void {
+  const sentinel = document.getElementById("scroll-sentinel");
+  if (!sentinel) return;
+
+  const observer = new IntersectionObserver((entries) => {
+    const entry = entries[0];
+    // Trigger when sentinel becomes visible (even partially) and we're not at end
+    if (entry.isIntersecting) {
+      const nextOffset = offset + limit;
+      if (nextOffset < totalPlans && !isLoadingMore) {
+        debouncedFetchMore(nextOffset);
       }
     }
+  }, {
+    root: null,
+    rootMargin: "500px",
+    threshold: 0,
+  });
+
+  observer.observe(sentinel);
+}
+
+// Debounced fetch more
+const debouncedFetchMore = debounce((nextOffset: number) => {
+  if (pendingOffset === nextOffset) return;
+  fetchMorePlans(nextOffset);
+}, 800);
+
+// Initial load
+async function init(): Promise<void> {
+  // Calculate dynamic limit
+  limit = calculateLimit();
+
+  // Start with empty array - render immediately
+  plans = [];
+  totalPlans = 0;
+  offset = 0;
+  filteredPlans = [];
+
+  // Check URL for initial state
+  const url = new URL(window.location.href);
+
+  // Load search query from URL
+  const queryParam = url.searchParams.get("q");
+  if (queryParam) {
+    searchQuery = queryParam;
+  }
+
+  // Load plan selection from URL - will be applied after data loads
+  const planFilename = url.searchParams.get("plan");
+
+  // Render empty state immediately (which calls attachEventListeners)
+  render();
+
+  // Fetch first batch in background
+  try {
+    const res = await fetch(`/api/plans?offset=0&limit=${limit}`);
+    const data = await res.json();
+
+    plans = data.plans;
+    totalPlans = data.total;
+    offset = 0;
+    highestIndexLoaded = plans.length - 1; // Mark that we've loaded the first batch
+    filteredPlans = [...plans];
+    syncStateToWindow();
+
+     // Try to restore plan selection
+     let foundPlan = false;
+     if (planFilename) {
+       const plan = plans.find((p) => p.filename === planFilename);
+       if (plan) {
+         selectedPlan = plan;
+         foundPlan = true;
+       } else {
+         // Plan not in first batch - need to load ALL plans to find it
+         const allPlans: Plan[] = [...plans];
+         
+         let currentOffset = plans.length;
+         while (currentOffset < totalPlans && !foundPlan) {
+           const res = await fetch(`/api/plans?offset=${currentOffset}&limit=${limit}`);
+           const batch = await res.json();
+           
+           // Add non-duplicate plans
+           const existingFilenames = new Set(allPlans.map(p => p.filename));
+           const newPlans = batch.plans.filter((p: Plan) => !existingFilenames.has(p.filename));
+           allPlans.push(...newPlans);
+           
+           // Check if target plan is in this batch
+           const targetPlan = batch.plans.find((p: Plan) => p.filename === planFilename);
+           if (targetPlan) {
+             selectedPlan = targetPlan;
+             foundPlan = true;
+           }
+           
+           currentOffset += batch.plans.length;
+         }
+         
+         // Update plans with all loaded data
+         plans = allPlans;
+         filteredPlans = [...plans];
+       }
+     }
 
     // Apply filters if search query was loaded
     if (searchQuery) {
@@ -898,7 +1356,25 @@ async function init(): Promise<void> {
     } else {
       render();
     }
+
+    // Lazy-load content if plan was selected
+    if (selectedPlan) {
+      ensurePlanContent(selectedPlan).then(() => updateDetailPanel());
+    }
+
+    // Setup infinite scroll after render
+    requestAnimationFrame(() => {
+      setupInfiniteScroll();
+      // Measure actual row height from first row
+      const firstRow = document.querySelector("tbody tr");
+      if (firstRow) {
+        rowHeight = (firstRow as HTMLElement).offsetHeight;
+      }
+      // Preemptively load next batch
+      preemptivelyLoadPlans(limit);
+    });
   } catch (err) {
+    console.error("[Init] Failed to load plans:", err);
     app.innerHTML = `<div class="empty-state"><p>Failed to load plans</p><p class="hint">${err}</p></div>`;
   }
 }

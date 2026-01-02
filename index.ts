@@ -156,9 +156,18 @@ async function buildProjectMapping(): Promise<ProjectMapping> {
   return mapping;
 }
 
+let cachedPlans: Plan[] | null = null;
+let cachedProjectMapping: ProjectMapping | null = null;
+
 async function loadPlans(): Promise<Plan[]> {
-  // Build project mapping from Claude Code metadata
-  const projectMapping = await buildProjectMapping();
+  // Build or use cached project mapping
+  let projectMapping: ProjectMapping;
+  if (!cachedProjectMapping) {
+    projectMapping = await buildProjectMapping();
+    cachedProjectMapping = projectMapping;
+  } else {
+    projectMapping = cachedProjectMapping;
+  }
 
   const files = await readdir(PLANS_DIR);
   const mdFiles = files.filter((f) => f.endsWith(".md"));
@@ -167,6 +176,7 @@ async function loadPlans(): Promise<Plan[]> {
     mdFiles.map(async (filename) => {
       const filepath = join(PLANS_DIR, filename);
       const file = Bun.file(filepath);
+
       const [content, stats] = await Promise.all([
         file.text(),
         stat(filepath),
@@ -179,6 +189,8 @@ async function loadPlans(): Promise<Plan[]> {
 
       // Look up project from metadata using plan slug (filename without .md)
       const slug = filename.replace(".md", "");
+      const lineCount = content.split("\n").length;
+      const wordCount = content.split(/\s+/).filter(Boolean).length;
 
       return {
         filename,
@@ -188,16 +200,19 @@ async function loadPlans(): Promise<Plan[]> {
         size: stats.size,
         modified: stats.mtime.toISOString(),
         created: stats.birthtime.toISOString(),
-        lineCount: content.split("\n").length,
-        wordCount: content.split(/\s+/).filter(Boolean).length,
+        lineCount,
+        wordCount,
         project: projectMapping[slug] || null,
       };
     })
   );
 
-  return plans.sort(
+  const sorted = plans.sort(
     (a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime()
   );
+  cachedPlans = sorted;
+
+  return sorted;
 }
 
 // Main server startup
@@ -212,9 +227,54 @@ async function startServer() {
     },
     routes: {
       "/": index,
-      "/api/plans": async () => {
-        const plans = await loadPlans();
-        return Response.json(plans);
+      "/api/plans": async (req) => {
+        // Lazy load cache on first request
+        if (!cachedPlans) {
+          await loadPlans();
+        }
+
+        const url = new URL(req.url);
+        const offset = parseInt(url.searchParams.get("offset") ?? "0", 10);
+        const limit = parseInt(url.searchParams.get("limit") ?? "50", 10);
+
+        const plans = cachedPlans || [];
+        const sliced = plans.slice(offset, offset + limit);
+
+        // Strip content from response - will be fetched separately via /api/plans/{id}/content
+        const plansWithoutContent = sliced.map(p => ({
+          filename: p.filename,
+          filepath: p.filepath,
+          title: p.title,
+          size: p.size,
+          modified: p.modified,
+          created: p.created,
+          lineCount: p.lineCount,
+          wordCount: p.wordCount,
+          project: p.project,
+        }));
+
+        return Response.json({
+          plans: plansWithoutContent,
+          total: plans.length,
+          offset,
+          limit,
+        });
+      },
+      "/api/plans/:filename/content": async (req) => {
+        // Lazy load cache on first request
+        if (!cachedPlans) {
+          await loadPlans();
+        }
+
+        const filename = req.params.filename as string;
+        const plans = cachedPlans || [];
+        const plan = plans.find(p => p.filename === filename);
+
+        if (!plan) {
+          return new Response("Plan not found", { status: 404 });
+        }
+
+        return Response.json({ content: plan.content });
       },
       "/api/open": {
         POST: async (req) => {

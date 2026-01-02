@@ -104,3 +104,41 @@ bun --hot ./index.ts
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+
+## Releasing
+
+This project uses semantic versioning and conventional commits.
+
+### Version Format
+
+- `vMAJOR.MINOR.PATCH` (e.g., v1.2.0)
+- Minor bumps for new features
+- Patch bumps for bug fixes
+- Major bumps for breaking changes
+
+### Commit Convention
+
+- `feat(scope):` - New features (-> Added in changelog)
+- `fix(scope):` - Bug fixes (-> Fixed in changelog)
+- `chore(scope):` - Maintenance tasks
+- `docs(scope):` - Documentation changes
+- `test(scope):` - Test additions/changes
+- `style(scope):` - Code style changes
+- `refactor(scope):` - Code refactoring
+- `build(scope):` - Build system changes
+
+### Release Process
+
+Run `/release` to automate the release (default: minor bump), or `/release patch` for a patch release.
+
+**Manual process:**
+
+1. Run tests: `bun test`
+2. Verify build: `bun run build`
+3. Commit any unstaged changes (conventional commits)
+4. Update version in `package.json`
+5. Update `CHANGELOG.md` with new version section
+6. Commit: `chore(release): vX.Y.Z - summary`
+7. Tag: `git tag vX.Y.Z`
+8. Push: `git push && git push --tags`
+9. Create GitHub release: `gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."`

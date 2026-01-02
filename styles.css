@@ -483,11 +483,11 @@ tbody tr:hover {
 }
 
 tr.selected {
-  background: var(--bg-selected);
+  background: rgba(107, 138, 205, 0.15);
 }
 
 tr.selected:hover {
-  background: var(--bg-selected);
+  background: rgba(107, 138, 205, 0.15);
 }
 
 .title-cell {
@@ -556,6 +556,19 @@ tr.selected .title-btn {
   font-variant-numeric: tabular-nums;
 }
 
+.date-col {
+  width: 90px;
+}
+
+.date-cell {
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  letter-spacing: -0.5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Detail Panel */
 .detail-panel {
   flex: 1;
@@ -564,6 +577,7 @@ tr.selected .title-btn {
   overflow: hidden;
   background: var(--bg-primary);
 }
+
 
 .detail-header {
   padding: 12px 16px;
@@ -683,6 +697,7 @@ tr.selected .title-btn {
   font-size: 13px;
   line-height: 1.6;
   max-width: 800px;
+  margin: 0 auto;
 }
 
 .markdown h1,
@@ -897,12 +912,13 @@ tr.selected .title-btn {
 .detail-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
-  backdrop-filter: blur(4px);
+  background: transparent;
+  backdrop-filter: none;
   z-index: 110;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 500ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  transition: opacity 320ms;
+  transition-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
 }
 
 .detail-overlay-panel {
@@ -915,49 +931,56 @@ tr.selected .title-btn {
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-  transform: translateY(8px) scale(0.98);
-  opacity: 0;
-  transition: transform 500ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 500ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  transform: translate(110%, 110%) scale(0.96);
+  opacity: 0.45;
+  filter: grayscale(0.25);
+  transition: transform 320ms, opacity 320ms, filter 320ms;
+  transition-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
 }
 
 .detail-overlay.is-open {
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
   opacity: 1;
   pointer-events: auto;
+  transition-timing-function: cubic-bezier(0.2, 1, 0.3, 1);
 }
 
 .detail-overlay.is-open .detail-overlay-panel {
-  transform: translateY(0) scale(1);
+  transform: translate(0, 0) scale(1);
   opacity: 1;
+  filter: grayscale(0);
+  transition-timing-function: cubic-bezier(0.2, 1, 0.3, 1);
 }
 
-.detail-overlay-header {
+.detail-overlay-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
+  gap: 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
 }
 
-.detail-overlay-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .detail-overlay-content {
   flex: 1;
   overflow: auto;
-  padding: 16px;
+  padding: 20px 16px;
 }
 
 .detail-overlay-meta {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-secondary);
+  padding: 0;
+  border-bottom: none;
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+  gap: 10px;
+}
+
+.detail-overlay-panel .markdown {
+  max-width: 720px;
+  margin: 60px auto;
 }
 
 @media (max-width: 700px) {
@@ -965,6 +988,17 @@ tr.selected .title-btn {
     inset: 12px;
   }
 }
+
+@media (max-width: 1000px) {
+  .detail-overlay-panel {
+    transform: translate(0, 110%) scale(0.96);
+  }
+
+  .detail-overlay.is-open .detail-overlay-panel {
+    transform: translateY(0) scale(1);
+  }
+}
+
 
 /* Help Modal */
 .modal-backdrop {

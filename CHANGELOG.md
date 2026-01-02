@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0] - 2025-01-02
+
+### Added
+- Fullscreen detail overlay for viewing plans (press `f` or click expand icon)
+- Filename column in the plans table
+- Creation date column (YYYY-MM-DD format) at start of table
+- Lazy content loading - plan content fetched on-demand for faster initial load
+- API pagination support (`offset`/`limit` query params)
+
+### Changed
+- Improved performance with server-side caching of plans and project mappings
+- Plans list now loads progressively with infinite scroll
+
 ## [1.1.1] - 2024-12-30
 
 ### Fixed

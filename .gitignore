@@ -32,4 +32,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Finder (MacOS) folder config
 .DS_Store
-Trace-20251231T072404.json
+
+# Playwright
+test-results/
+playwright-report/
+e2e/screenshots/

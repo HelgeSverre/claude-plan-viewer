@@ -2,7 +2,7 @@
 Default to using Bun instead of Node.js.
 
 - Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
+- Use `bun run test` instead of `jest` or `vitest` (NOT `bun test` directly)
 - Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
 - Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
 - Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
@@ -21,7 +21,7 @@ Default to using Bun instead of Node.js.
 
 ## Testing
 
-Use `bun test` to run tests.
+Use `bun run test` to run tests (NOT `bun test` directly).
 
 ```ts#index.test.ts
 import { test, expect } from "bun:test";
@@ -133,7 +133,7 @@ Run `/release` to automate the release (default: minor bump), or `/release patch
 
 **Manual process:**
 
-1. Run tests: `bun test`
+1. Run tests: `bun run test`
 2. Verify build: `bun run build`
 3. Commit any unstaged changes (conventional commits)
 4. Update version in `package.json`

@@ -9,13 +9,15 @@
   "files": [
     "index.ts",
     "index.html",
-    "frontend.ts",
+    "src",
     "styles.css",
     "prism.bundle.js"
   ],
   "scripts": {
     "start": "bun index.ts",
     "dev": "bun --hot index.ts",
+    "test": "bun test index.test.ts frontend.test.ts",
+    "test:e2e": "bunx playwright test",
     "build": "bun build --compile --minify --bytecode ./index.ts --outfile ./dist/plans-viewer",
     "build:macos-arm64": "bun build --compile --target=bun-darwin-arm64 --minify --bytecode ./index.ts --outfile ./dist/plans-viewer-macos-arm64",
     "build:macos-x64": "bun build --compile --target=bun-darwin-x64 --minify --bytecode ./index.ts --outfile ./dist/plans-viewer-macos-x64",
@@ -46,9 +48,16 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3"
   },
   "peerDependencies": {
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-select": "^5.10.2"
   }
 }

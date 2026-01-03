@@ -155,14 +155,114 @@ describe("extractSlugsFromJsonl", () => {
 });
 
 // ============================================================================
+// extractSlugSessionMap: Extract slug -> sessionId mappings from JSONL
+// ============================================================================
+
+describe("extractSlugSessionMap", () => {
+  // Implementation: Extract slug -> sessionId mapping from JSONL content
+  function extractSlugSessionMap(content: string): Map<string, string> {
+    if (!content) return new Map();
+    const slugSessionMap = new Map<string, string>();
+
+    const lines = content.split("\n");
+    for (const line of lines) {
+      if (!line.trim()) continue;
+
+      const slugMatch = line.match(/"slug":"([\w-]+)"/);
+      const sessionMatch = line.match(/"sessionId":"([^"]+)"/);
+
+      if (slugMatch && sessionMatch) {
+        slugSessionMap.set(slugMatch[1], sessionMatch[1]);
+      }
+    }
+
+    return slugSessionMap;
+  }
+
+  test("extracts slug and sessionId from single line", () => {
+    const content = '{"slug":"happy-rabbit","sessionId":"05723b08-43ce-4ee1-a0dd-842991cad4bd"}';
+    const result = extractSlugSessionMap(content);
+    expect(result.get("happy-rabbit")).toBe("05723b08-43ce-4ee1-a0dd-842991cad4bd");
+    expect(result.size).toBe(1);
+  });
+
+  test("extracts multiple slug-session pairs from multi-line content", () => {
+    const content = `{"slug":"first-slug","sessionId":"session-1","type":"user"}
+{"slug":"second-slug","sessionId":"session-2","type":"assistant"}`;
+    const result = extractSlugSessionMap(content);
+    expect(result.get("first-slug")).toBe("session-1");
+    expect(result.get("second-slug")).toBe("session-2");
+    expect(result.size).toBe(2);
+  });
+
+  test("ignores lines without both slug and sessionId", () => {
+    const content = `{"slug":"has-slug-only","type":"user"}
+{"sessionId":"has-session-only","type":"assistant"}
+{"slug":"complete","sessionId":"session-123"}`;
+    const result = extractSlugSessionMap(content);
+    expect(result.size).toBe(1);
+    expect(result.get("complete")).toBe("session-123");
+  });
+
+  test("returns empty map for content without slug-session pairs", () => {
+    const content = '{"type":"summary","data":"no slugs or sessions"}';
+    const result = extractSlugSessionMap(content);
+    expect(result.size).toBe(0);
+  });
+
+  test("returns empty map for empty content", () => {
+    expect(extractSlugSessionMap("").size).toBe(0);
+  });
+
+  test("returns empty map for null-ish values", () => {
+    expect(extractSlugSessionMap(null as unknown as string).size).toBe(0);
+    expect(extractSlugSessionMap(undefined as unknown as string).size).toBe(0);
+  });
+
+  test("handles UUID sessionIds correctly", () => {
+    const content = '{"slug":"test-plan","sessionId":"a1b2c3d4-e5f6-7890-abcd-ef1234567890"}';
+    const result = extractSlugSessionMap(content);
+    expect(result.get("test-plan")).toBe("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+  });
+
+  test("later occurrence overwrites earlier for same slug", () => {
+    const content = `{"slug":"duplicate","sessionId":"old-session"}
+{"slug":"duplicate","sessionId":"new-session"}`;
+    const result = extractSlugSessionMap(content);
+    expect(result.get("duplicate")).toBe("new-session");
+    expect(result.size).toBe(1);
+  });
+
+  test("handles empty lines gracefully", () => {
+    const content = `{"slug":"valid","sessionId":"session-1"}
+
+{"slug":"also-valid","sessionId":"session-2"}
+`;
+    const result = extractSlugSessionMap(content);
+    expect(result.size).toBe(2);
+  });
+
+  test("handles slugs with numbers and hyphens", () => {
+    const content = '{"slug":"plan-123-test","sessionId":"sess-456"}';
+    const result = extractSlugSessionMap(content);
+    expect(result.get("plan-123-test")).toBe("sess-456");
+  });
+});
+
+// ============================================================================
 // Integration: buildProjectMapping
 // ============================================================================
 
 describe("buildProjectMapping integration", () => {
   // This tests the full flow with mock data
 
+  interface SlugMetadata {
+    project: string;
+    sessionId: string | null;
+  }
+
   interface ProjectMapping {
-    [slug: string]: string;
+    [slug: string]: SlugMetadata;
   }
 
   // Helper: extract project name from path
@@ -175,36 +275,45 @@ describe("buildProjectMapping integration", () => {
   }
 
   function buildProjectMappingFromData(
-    projectData: Array<{ cwd: string; slugs: string[] }>
+    projectData: Array<{ cwd: string; slugSessions: Array<{ slug: string; sessionId: string }> }>
   ): ProjectMapping {
     const mapping: ProjectMapping = {};
-    for (const { cwd, slugs } of projectData) {
+    for (const { cwd, slugSessions } of projectData) {
       const projectName = extractProjectName(cwd);
-      for (const slug of slugs) {
-        mapping[slug] = projectName;
+      for (const { slug, sessionId } of slugSessions) {
+        mapping[slug] = { project: projectName, sessionId };
       }
     }
     return mapping;
   }
 
-  test("builds mapping from single project", () => {
+  test("builds mapping with project and sessionId from single project", () => {
     const data = [
-      { cwd: "/Users/helge/code/plans-viewer", slugs: ["happy-rabbit", "sad-cat"] }
+      {
+        cwd: "/Users/helge/code/plans-viewer",
+        slugSessions: [
+          { slug: "happy-rabbit", sessionId: "session-123" },
+          { slug: "sad-cat", sessionId: "session-456" }
+        ]
+      }
     ];
     const mapping = buildProjectMappingFromData(data);
-    expect(mapping["happy-rabbit"]).toBe("plans-viewer");
-    expect(mapping["sad-cat"]).toBe("plans-viewer");
+    expect(mapping["happy-rabbit"]).toEqual({ project: "plans-viewer", sessionId: "session-123" });
+    expect(mapping["sad-cat"]).toEqual({ project: "plans-viewer", sessionId: "session-456" });
   });
 
-  test("builds mapping from multiple projects", () => {
+  test("builds mapping from multiple projects with sessionIds", () => {
     const data = [
-      { cwd: "/Users/helge/code/project-a", slugs: ["slug-1"] },
-      { cwd: "/Users/helge/code/project-b", slugs: ["slug-2", "slug-3"] },
+      { cwd: "/Users/helge/code/project-a", slugSessions: [{ slug: "slug-1", sessionId: "sess-a" }] },
+      { cwd: "/Users/helge/code/project-b", slugSessions: [
+        { slug: "slug-2", sessionId: "sess-b1" },
+        { slug: "slug-3", sessionId: "sess-b2" }
+      ]},
     ];
     const mapping = buildProjectMappingFromData(data);
-    expect(mapping["slug-1"]).toBe("project-a");
-    expect(mapping["slug-2"]).toBe("project-b");
-    expect(mapping["slug-3"]).toBe("project-b");
+    expect(mapping["slug-1"]).toEqual({ project: "project-a", sessionId: "sess-a" });
+    expect(mapping["slug-2"]).toEqual({ project: "project-b", sessionId: "sess-b1" });
+    expect(mapping["slug-3"]).toEqual({ project: "project-b", sessionId: "sess-b2" });
   });
 
   test("handles empty data", () => {
@@ -214,19 +323,30 @@ describe("buildProjectMapping integration", () => {
 
   test("handles project with no slugs", () => {
     const data = [
-      { cwd: "/Users/helge/code/no-slugs", slugs: [] }
+      { cwd: "/Users/helge/code/no-slugs", slugSessions: [] }
     ];
     const mapping = buildProjectMappingFromData(data);
     expect(mapping).toEqual({});
   });
 
-  test("later project wins for duplicate slugs", () => {
+  test("later project wins for duplicate slugs (with sessionId)", () => {
     const data = [
-      { cwd: "/Users/helge/code/old-project", slugs: ["duplicate-slug"] },
-      { cwd: "/Users/helge/code/new-project", slugs: ["duplicate-slug"] },
+      { cwd: "/Users/helge/code/old-project", slugSessions: [{ slug: "duplicate-slug", sessionId: "old-sess" }] },
+      { cwd: "/Users/helge/code/new-project", slugSessions: [{ slug: "duplicate-slug", sessionId: "new-sess" }] },
     ];
     const mapping = buildProjectMappingFromData(data);
-    expect(mapping["duplicate-slug"]).toBe("new-project");
+    expect(mapping["duplicate-slug"]).toEqual({ project: "new-project", sessionId: "new-sess" });
+  });
+
+  test("preserves UUID format sessionIds", () => {
+    const data = [
+      {
+        cwd: "/Users/helge/code/test",
+        slugSessions: [{ slug: "test-plan", sessionId: "05723b08-43ce-4ee1-a0dd-842991cad4bd" }]
+      }
+    ];
+    const mapping = buildProjectMappingFromData(data);
+    expect(mapping["test-plan"].sessionId).toBe("05723b08-43ce-4ee1-a0dd-842991cad4bd");
   });
 });
 

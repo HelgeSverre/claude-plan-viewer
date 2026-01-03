@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { readdir, stat } from "node:fs/promises";
+import { readdir, stat, watch } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import index from "./index.html";
@@ -8,16 +8,54 @@ import prismBundlePath from "./prism.bundle.js" with { type: "file" };
 const PLANS_DIR = join(homedir(), ".claude", "plans");
 const PROJECTS_DIR = join(homedir(), ".claude", "projects");
 
-// Parse --port from command line arguments (undefined = auto-assign)
-function getRequestedPort(): number | undefined {
-  const args = process.argv;
-  const portIndex = args.indexOf("--port");
-  const portArg = args[portIndex + 1];
-  if (portIndex !== -1 && portArg) {
-    const port = parseInt(portArg, 10);
-    if (!isNaN(port)) return port;
+interface CliArgs {
+  port?: number;
+  json?: boolean;
+  output?: string;
+}
+
+function parseCliArgs(): CliArgs {
+  const args: CliArgs = {};
+  const argv = process.argv.slice(2);
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    const nextArg = argv[i + 1];
+
+    if (arg === "--port" || arg === "-p") {
+      if (nextArg && !nextArg.startsWith("-")) {
+        args.port = parseInt(nextArg, 10);
+        i++;
+      }
+    } else if (arg === "--json" || arg === "-j") {
+      args.json = true;
+    } else if (arg === "--output" || arg === "-o") {
+      if (nextArg && !nextArg.startsWith("-")) {
+        args.output = nextArg;
+        i++;
+      }
+    }
   }
-  return undefined;
+
+  return args;
+}
+
+async function exportPlansAsJson(outputPath?: string): Promise<void> {
+  const plans = await loadPlans();
+
+  const plansWithContent = plans.map((plan) => ({
+    ...plan,
+    content: contentCache.get(plan.filename) || "",
+  }));
+
+  const jsonOutput = JSON.stringify(plansWithContent, null, 2);
+
+  if (outputPath) {
+    await Bun.write(outputPath, jsonOutput);
+    console.log(`Exported ${plans.length} plans to ${outputPath}`);
+  } else {
+    console.log(jsonOutput);
+  }
 }
 
 // Find an available port starting from the requested port
@@ -52,17 +90,21 @@ async function openInEditor(filepath: string): Promise<void> {
   }
 }
 
-interface Plan {
+interface PlanMetadata {
   filename: string;
   filepath: string;
   title: string;
-  content: string;
   size: number;
   modified: string;
   created: string;
   lineCount: number;
   wordCount: number;
   project: string | null;
+  sessionId: string | null;
+}
+
+interface Plan extends PlanMetadata {
+  content: string;
 }
 
 // Extract project name from a full path (cross-platform)
@@ -83,27 +125,56 @@ function extractProjectName(cwd: string): string {
 function extractCwdFromJsonl(content: string): string | null {
   if (!content) return null;
   const match = content.match(/"cwd":"([^"]+)"/);
-  if (!match) return null;
+  if (!match || !match[1]) return null;
   // Unescape JSON string (convert \\\\ to \\)
   return match[1].replace(/\\\\/g, "\\");
 }
 
-// Extract unique slugs from JSONL content
+// Extract slug -> sessionId mapping from JSONL content
+// Each line in JSONL may contain both "slug" and "sessionId" fields
+function extractSlugSessionMap(content: string): Map<string, string> {
+  if (!content) return new Map();
+  const slugSessionMap = new Map<string, string>();
+
+  // Process each line to find slug and sessionId pairs
+  const lines = content.split("\n");
+  for (const line of lines) {
+    if (!line.trim()) continue;
+
+    const slugMatch = line.match(/"slug":"([\w-]+)"/);
+    const sessionMatch = line.match(/"sessionId":"([^"]+)"/);
+
+    if (slugMatch && slugMatch[1] && sessionMatch && sessionMatch[1]) {
+      slugSessionMap.set(slugMatch[1], sessionMatch[1]);
+    }
+  }
+
+  return slugSessionMap;
+}
+
+// Extract unique slugs from JSONL content (for backwards compatibility)
 function extractSlugsFromJsonl(content: string): string[] {
   if (!content) return [];
   const slugs = new Set<string>();
   const matches = content.matchAll(/"slug":"([\w-]+)"/g);
   for (const match of matches) {
-    slugs.add(match[1]);
+    if (match[1]) {
+      slugs.add(match[1]);
+    }
   }
   return Array.from(slugs);
 }
 
-interface ProjectMapping {
-  [slug: string]: string; // plan slug -> project name
+interface SlugMetadata {
+  project: string;
+  sessionId: string | null;
 }
 
-// Build a mapping of plan slugs to project names by scanning Claude Code's project metadata
+interface ProjectMapping {
+  [slug: string]: SlugMetadata;
+}
+
+// Build a mapping of plan slugs to project names and session IDs by scanning Claude Code's project metadata
 async function buildProjectMapping(): Promise<ProjectMapping> {
   const mapping: ProjectMapping = {};
 
@@ -115,12 +186,12 @@ async function buildProjectMapping(): Promise<ProjectMapping> {
       const dirStats = await stat(dirPath);
       if (!dirStats.isDirectory()) continue;
 
-      // Find JSONL files and extract cwd + slugs
+      // Find JSONL files and extract cwd + slugs + sessionIds
       const files = await readdir(dirPath);
       const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
 
       let projectName: string | null = null;
-      const allSlugs: string[] = [];
+      const slugSessionMap = new Map<string, string>();
 
       for (const file of jsonlFiles) {
         try {
@@ -134,18 +205,23 @@ async function buildProjectMapping(): Promise<ProjectMapping> {
             }
           }
 
-          // Collect all slugs
-          const slugs = extractSlugsFromJsonl(content);
-          allSlugs.push(...slugs);
+          // Collect slug -> sessionId mappings
+          const fileSlugSessions = extractSlugSessionMap(content);
+          for (const [slug, sessionId] of fileSlugSessions) {
+            slugSessionMap.set(slug, sessionId);
+          }
         } catch {
           // Skip files that can't be read
         }
       }
 
-      // Map all slugs to this project
+      // Map all slugs to this project with their session IDs
       if (projectName) {
-        for (const slug of allSlugs) {
-          mapping[slug] = projectName;
+        for (const [slug, sessionId] of slugSessionMap) {
+          mapping[slug] = {
+            project: projectName,
+            sessionId: sessionId,
+          };
         }
       }
     }
@@ -156,10 +232,11 @@ async function buildProjectMapping(): Promise<ProjectMapping> {
   return mapping;
 }
 
-let cachedPlans: Plan[] | null = null;
+let cachedPlans: PlanMetadata[] | null = null;
 let cachedProjectMapping: ProjectMapping | null = null;
+const contentCache = new Map<string, string>();
 
-async function loadPlans(): Promise<Plan[]> {
+async function loadPlans(): Promise<PlanMetadata[]> {
   // Build or use cached project mapping
   let projectMapping: ProjectMapping;
   if (!cachedProjectMapping) {
@@ -192,56 +269,80 @@ async function loadPlans(): Promise<Plan[]> {
       const lineCount = content.split("\n").length;
       const wordCount = content.split(/\s+/).filter(Boolean).length;
 
+      const metadata = projectMapping[slug];
+      // Cache content separately for search and lazy loading
+      contentCache.set(filename, content);
+
       return {
         filename,
         filepath,
         title,
-        content,
         size: stats.size,
         modified: stats.mtime.toISOString(),
         created: stats.birthtime.toISOString(),
         lineCount,
         wordCount,
-        project: projectMapping[slug] || null,
+        project: metadata?.project || null,
+        sessionId: metadata?.sessionId || null,
       };
     })
   );
 
-  const sorted = plans.sort(
-    (a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime()
-  );
-  cachedPlans = sorted;
+  cachedPlans = plans;
+  return plans;
+}
 
-  return sorted;
+function invalidateCache() {
+  cachedPlans = null;
+  cachedProjectMapping = null;
+  contentCache.clear();
+}
+
+// Watch plans directory for changes and invalidate cache
+async function watchPlansDirectory() {
+  try {
+    const watcher = watch(PLANS_DIR);
+    for await (const event of watcher) {
+      if (event.filename?.endsWith(".md")) {
+        invalidateCache();
+      }
+    }
+  } catch {
+    // Directory may not exist or watching may not be supported
+  }
 }
 
 // Main server startup
 async function startServer() {
-  const requestedPort = getRequestedPort();
-  const port = await findAvailablePort(requestedPort ?? 3000);
+  const args = parseCliArgs();
+  const port = await findAvailablePort(args.port ?? 3000);
 
   const server = Bun.serve({
     port,
-    static: {
-      "/prism.bundle.js": Bun.file(prismBundlePath),
-    },
     routes: {
       "/": index,
+      "/api/projects": async () => {
+        // Lazy load cache on first request
+        if (!cachedPlans) {
+          await loadPlans();
+        }
+
+        const plans = cachedPlans || [];
+        const projects = [...new Set(plans.map(p => p.project).filter(Boolean))] as string[];
+        projects.sort((a, b) => a.localeCompare(b));
+
+        return Response.json({ projects });
+      },
       "/api/plans": async (req) => {
         // Lazy load cache on first request
         if (!cachedPlans) {
           await loadPlans();
         }
 
-        const url = new URL(req.url);
-        const offset = parseInt(url.searchParams.get("offset") ?? "0", 10);
-        const limit = parseInt(url.searchParams.get("limit") ?? "50", 10);
-
         const plans = cachedPlans || [];
-        const sliced = plans.slice(offset, offset + limit);
 
         // Strip content from response - will be fetched separately via /api/plans/{id}/content
-        const plansWithoutContent = sliced.map(p => ({
+        const plansWithoutContent = plans.map(p => ({
           filename: p.filename,
           filepath: p.filepath,
           title: p.title,
@@ -251,13 +352,11 @@ async function startServer() {
           lineCount: p.lineCount,
           wordCount: p.wordCount,
           project: p.project,
+          sessionId: p.sessionId,
         }));
 
         return Response.json({
           plans: plansWithoutContent,
-          total: plans.length,
-          offset,
-          limit,
         });
       },
       "/api/plans/:filename/content": async (req) => {
@@ -267,14 +366,20 @@ async function startServer() {
         }
 
         const filename = req.params.filename as string;
-        const plans = cachedPlans || [];
-        const plan = plans.find(p => p.filename === filename);
+        const content = contentCache.get(filename);
 
-        if (!plan) {
+        if (content === undefined) {
           return new Response("Plan not found", { status: 404 });
         }
 
-        return Response.json({ content: plan.content });
+        return Response.json({ content });
+      },
+      "/api/refresh": {
+        POST: async () => {
+          invalidateCache();
+          await loadPlans();
+          return Response.json({ success: true });
+        },
       },
       "/api/open": {
         POST: async (req) => {
@@ -313,12 +418,24 @@ const c = {
 
 // Main entry point
 (async () => {
+  const args = parseCliArgs();
+
+  if (args.json) {
+    await exportPlansAsJson(args.output);
+    process.exit(0);
+  }
+
   const server = await startServer();
   const planCount = (await readdir(PLANS_DIR)).filter(f => f.endsWith('.md')).length;
+
+  // Start watching for file changes (runs in background)
+  watchPlansDirectory();
+
   console.log();
   console.log(`${c.bold}${c.magenta}  📋 Plans Viewer${c.reset}`);
   console.log(`${c.dim}  ─────────────────────────────${c.reset}`);
   console.log(`${c.green}  ✓${c.reset} Server running`);
+  console.log(`${c.green}  ✓${c.reset} Watching for file changes`);
   console.log();
   console.log(`${c.dim}  Local:${c.reset}   ${c.cyan}${c.bold}http://localhost:${server.port}${c.reset}`);
   console.log(`${c.dim}  Plans:${c.reset}   ${c.yellow}${planCount} plans${c.reset} in ${c.dim}${PLANS_DIR}${c.reset}`);

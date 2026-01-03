@@ -1,0 +1,173 @@
+import { useState, useCallback, useEffect, useMemo } from "react";
+import type { Plan } from "./types.ts";
+import { usePlans } from "./hooks/usePlans.ts";
+import { useProjects } from "./hooks/useProjects.ts";
+import { useFilters } from "./hooks/useFilters.ts";
+import { useDebounce } from "./hooks/useDebounce.ts";
+import { useKeyboard } from "./hooks/useKeyboard.ts";
+import { openInEditor } from "./utils/api.ts";
+import { Header } from "./components/Header.tsx";
+import { PlansTable } from "./components/PlansTable.tsx";
+import { DetailPanel } from "./components/DetailPanel.tsx";
+import { DetailOverlay } from "./components/DetailOverlay.tsx";
+import { HelpModal } from "./components/HelpModal.tsx";
+
+export function App() {
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [showOverlay, setShowOverlay] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+
+  // Filter state
+  const {
+    searchQuery,
+    setSearchQuery,
+    sortKey,
+    sortDir,
+    setSort,
+    selectedProjects,
+    toggleProject,
+    clearProjects,
+  } = useFilters();
+
+  // Debounce search to avoid hitting API on every keystroke
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  // Convert Set to array for API
+  const projectsArray = useMemo(
+    () => Array.from(selectedProjects),
+    [selectedProjects]
+  );
+
+  // Fetch plans with server-side filtering
+  const { plans, loading, refresh, ensureContent } = usePlans({
+    q: debouncedSearch,
+    sort: sortKey,
+    dir: sortDir,
+    projects: projectsArray,
+  });
+
+  // Fetch projects list
+  const { projects: allProjects } = useProjects();
+
+  // Load content when plan is selected
+  const handleSelectPlan = useCallback(
+    async (plan: Plan | null) => {
+      if (plan) {
+        const withContent = await ensureContent(plan);
+        setSelectedPlan(withContent);
+      } else {
+        setSelectedPlan(null);
+      }
+    },
+    [ensureContent]
+  );
+
+  // Open in editor
+  const handleOpenEditor = useCallback(async () => {
+    if (selectedPlan) {
+      await openInEditor(selectedPlan.filepath);
+    }
+  }, [selectedPlan]);
+
+  // Copy session ID
+  const handleCopySession = useCallback((sessionId: string) => {
+    navigator.clipboard.writeText(`claude --resume ${sessionId}`);
+  }, []);
+
+  // Clear search
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery("");
+    const searchEl = document.getElementById("search") as HTMLInputElement;
+    searchEl?.blur();
+  }, [setSearchQuery]);
+
+  // Keyboard shortcuts
+  useKeyboard({
+    plans,
+    selectedPlan,
+    onSelectPlan: handleSelectPlan,
+    onOpenEditor: handleOpenEditor,
+    onToggleHelp: () => setShowHelp((prev) => !prev),
+    onToggleOverlay: () => setShowOverlay((prev) => !prev),
+    onClearSearch: handleClearSearch,
+  });
+
+  // Auto-select first plan when plans change
+  useEffect(() => {
+    if (!selectedPlan && plans.length > 0) {
+      const firstPlan = plans[0];
+      if (firstPlan) {
+        handleSelectPlan(firstPlan);
+      }
+    }
+  }, [plans, selectedPlan, handleSelectPlan]);
+
+  // Clear selection if selected plan is no longer in results
+  useEffect(() => {
+    if (selectedPlan && !plans.find((p) => p.filename === selectedPlan.filename)) {
+      setSelectedPlan(null);
+    }
+  }, [plans, selectedPlan]);
+
+  if (loading && plans.length === 0) {
+    return (
+      <div className="container">
+        <div className="loading-container">
+          <div className="loading">Loading plans...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container">
+      <div id="list-panel" className="list-panel">
+        <Header
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          projects={allProjects}
+          selectedProjects={selectedProjects}
+          onToggleProject={toggleProject}
+          onClearProjects={clearProjects}
+          onRefresh={refresh}
+        />
+
+        {plans.length === 0 ? (
+          <div className="empty-state">
+            {searchQuery || selectedProjects.size > 0
+              ? "No plans match your filters"
+              : "No plans found"}
+          </div>
+        ) : (
+          <PlansTable
+            plans={plans}
+            selectedPlan={selectedPlan}
+            searchQuery={searchQuery}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSelectPlan={handleSelectPlan}
+            onSort={setSort}
+          />
+        )}
+      </div>
+
+      <DetailPanel
+        plan={selectedPlan}
+        onOpenEditor={handleOpenEditor}
+        onToggleOverlay={() => setShowOverlay(true)}
+        onCopySession={handleCopySession}
+      />
+
+      {showOverlay && selectedPlan && (
+        <DetailOverlay
+          plan={selectedPlan}
+          onClose={() => setShowOverlay(false)}
+          onOpenEditor={handleOpenEditor}
+          onCopySession={handleCopySession}
+        />
+      )}
+
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+    </div>
+  );
+}

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.0] - 2025-01-08
+
+### Changed
+- Migrated frontend from vanilla JavaScript to React components
+- Added React Select for improved dropdown interactions
+
+### Dependencies
+- Added React 19, React DOM, and React Select
+
 ## [1.2.0] - 2025-01-02
 
 ### Added

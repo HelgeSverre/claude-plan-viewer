@@ -2,16 +2,33 @@
 import { readdir, stat, watch } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import index from "./index.html";
-import prismBundlePath from "./prism.bundle.js" with { type: "file" };
+import index from "./src/index.html";
+import apiDocs from "./src/api-docs.html";
+import prismBundlePath from "./src/libs/prism.bundle.js" with { type: "file" };
+import pkg from "./package.json";
+import openapi from "./openapi.json";
 
-const PLANS_DIR = join(homedir(), ".claude", "plans");
-const PROJECTS_DIR = join(homedir(), ".claude", "projects");
+// Resolved at startup based on --claude-dir flag or CLAUDE_DIR env var
+let PLANS_DIR: string;
+let PROJECTS_DIR: string;
+
+function resolveClaudeDir(cliArg?: string): string {
+  return cliArg || process.env.CLAUDE_DIR || join(homedir(), ".claude");
+}
+
+function initializeDirectories(claudeDir: string): void {
+  PLANS_DIR = join(claudeDir, "plans");
+  PROJECTS_DIR = join(claudeDir, "projects");
+}
 
 interface CliArgs {
   port?: number;
   json?: boolean;
   output?: string;
+  fromFile?: string;
+  claudeDir?: string;
+  version?: boolean;
+  help?: boolean;
 }
 
 function parseCliArgs(): CliArgs {
@@ -34,10 +51,49 @@ function parseCliArgs(): CliArgs {
         args.output = nextArg;
         i++;
       }
+    } else if (arg === "--from-file" || arg === "-f") {
+      if (nextArg && !nextArg.startsWith("-")) {
+        args.fromFile = nextArg;
+        i++;
+      }
+    } else if (arg === "--claude-dir" || arg === "-c") {
+      if (nextArg && !nextArg.startsWith("-")) {
+        args.claudeDir = nextArg;
+        i++;
+      }
+    } else if (arg === "--version" || arg === "-v") {
+      args.version = true;
+    } else if (arg === "--help" || arg === "-h") {
+      args.help = true;
     }
   }
 
   return args;
+}
+
+function printHelp(): void {
+  console.log(`
+claude-plan-viewer - Browse and search Claude Code plans
+
+Usage: claude-plan-viewer [options]
+
+Options:
+  -p, --port <number>       Port to start server on (default: 3000)
+  -c, --claude-dir <path>   Path to .claude directory (default: ~/.claude)
+                            Can also be set via CLAUDE_DIR environment variable
+  -j, --json                Export all plans as JSON and exit
+  -o, --output <file>       Output file for JSON export (stdout if omitted)
+  -f, --from-file <file>    Load plans from JSON file instead of ~/.claude/plans
+  -v, --version             Show version number
+  -h, --help                Show this help message
+
+Examples:
+  claude-plan-viewer                        Start viewer on default port
+  claude-plan-viewer -p 8080                Start on port 8080
+  claude-plan-viewer -c /path/to/.claude    Use custom .claude directory
+  claude-plan-viewer -j -o plans.json       Export plans to file
+  claude-plan-viewer -f plans.json          Load plans from exported file
+`);
 }
 
 async function exportPlansAsJson(outputPath?: string): Promise<void> {
@@ -56,6 +112,38 @@ async function exportPlansAsJson(outputPath?: string): Promise<void> {
   } else {
     console.log(jsonOutput);
   }
+}
+
+async function loadPlansFromFile(filepath: string): Promise<PlanMetadata[]> {
+  const file = Bun.file(filepath);
+  const exists = await file.exists();
+
+  if (!exists) {
+    console.error(`File not found: ${filepath}`);
+    process.exit(1);
+  }
+
+  const data = await file.json();
+  const plans: PlanMetadata[] = [];
+
+  for (const plan of data) {
+    contentCache.set(plan.filename, plan.content || "");
+    plans.push({
+      filename: plan.filename,
+      filepath: plan.filepath,
+      title: plan.title,
+      size: plan.size,
+      modified: plan.modified,
+      created: plan.created,
+      lineCount: plan.lineCount,
+      wordCount: plan.wordCount,
+      project: plan.project,
+      sessionId: plan.sessionId,
+    });
+  }
+
+  cachedPlans = plans;
+  return plans;
 }
 
 // Find an available port starting from the requested port
@@ -321,6 +409,8 @@ async function startServer() {
     port,
     routes: {
       "/": index,
+      "/api/": apiDocs,
+      "/api/openapi.json": () => Response.json(openapi),
       "/api/projects": async () => {
         // Lazy load cache on first request
         if (!cachedPlans) {
@@ -420,24 +510,52 @@ const c = {
 (async () => {
   const args = parseCliArgs();
 
+  if (args.version) {
+    console.log(`claude-plan-viewer v${pkg.version}`);
+    process.exit(0);
+  }
+
+  if (args.help) {
+    printHelp();
+    process.exit(0);
+  }
+
+  // Initialize directory paths based on --claude-dir flag or CLAUDE_DIR env var
+  const claudeDir = resolveClaudeDir(args.claudeDir);
+  initializeDirectories(claudeDir);
+
   if (args.json) {
     await exportPlansAsJson(args.output);
     process.exit(0);
   }
 
-  const server = await startServer();
-  const planCount = (await readdir(PLANS_DIR)).filter(f => f.endsWith('.md')).length;
+  // Pre-load plans from file if --from-file is provided
+  let planCount: number;
+  let sourceDisplay: string;
 
-  // Start watching for file changes (runs in background)
-  watchPlansDirectory();
+  if (args.fromFile) {
+    const plans = await loadPlansFromFile(args.fromFile);
+    planCount = plans.length;
+    sourceDisplay = args.fromFile;
+  } else {
+    planCount = (await readdir(PLANS_DIR)).filter(f => f.endsWith('.md')).length;
+    sourceDisplay = PLANS_DIR;
+    // Only watch for file changes when not using --from-file
+    watchPlansDirectory();
+  }
+
+  const server = await startServer();
 
   console.log();
   console.log(`${c.bold}${c.magenta}  📋 Plans Viewer${c.reset}`);
   console.log(`${c.dim}  ─────────────────────────────${c.reset}`);
   console.log(`${c.green}  ✓${c.reset} Server running`);
-  console.log(`${c.green}  ✓${c.reset} Watching for file changes`);
+  if (!args.fromFile) {
+    console.log(`${c.green}  ✓${c.reset} Watching for file changes`);
+  }
   console.log();
   console.log(`${c.dim}  Local:${c.reset}   ${c.cyan}${c.bold}http://localhost:${server.port}${c.reset}`);
-  console.log(`${c.dim}  Plans:${c.reset}   ${c.yellow}${planCount} plans${c.reset} in ${c.dim}${PLANS_DIR}${c.reset}`);
+  console.log(`${c.dim}  API:${c.reset}     ${c.cyan}http://localhost:${server.port}/api/${c.reset}`);
+  console.log(`${c.dim}  Plans:${c.reset}   ${c.yellow}${planCount} plans${c.reset} in ${c.dim}${sourceDisplay}${c.reset}`);
   console.log();
 })();

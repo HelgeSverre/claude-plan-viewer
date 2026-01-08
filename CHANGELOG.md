@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0] - 2026-01-08
+
+### Added
+- New `--claude-dir` / `-c` CLI flag to specify custom `.claude` directory path
+- Support for `CLAUDE_DIR` environment variable as alternative to CLI flag
+- CLI flag takes precedence over environment variable when both are set
+
 ## [1.3.0] - 2025-01-08
 
 ### Changed

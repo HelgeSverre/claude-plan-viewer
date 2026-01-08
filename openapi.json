@@ -1,0 +1,237 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Claude Plan Viewer API",
+    "description": "API for browsing and searching Claude Code plans",
+    "version": "1.4.0",
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current server"
+    }
+  ],
+  "paths": {
+    "/api/plans": {
+      "get": {
+        "summary": "List all plans",
+        "description": "Returns metadata for all plans without content. Use /api/plans/{filename}/content to get content.",
+        "operationId": "listPlans",
+        "responses": {
+          "200": {
+            "description": "List of plans",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plans": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PlanMetadata"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plans/{filename}/content": {
+      "get": {
+        "summary": "Get plan content",
+        "description": "Returns the markdown content for a specific plan",
+        "operationId": "getPlanContent",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "description": "The plan filename (e.g., my-plan.md)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plan content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "string",
+                      "description": "Markdown content of the plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Plan not found"
+          }
+        }
+      }
+    },
+    "/api/projects": {
+      "get": {
+        "summary": "List all projects",
+        "description": "Returns a list of unique project names associated with plans",
+        "operationId": "listProjects",
+        "responses": {
+          "200": {
+            "description": "List of project names",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/refresh": {
+      "post": {
+        "summary": "Refresh cache",
+        "description": "Invalidates the plan cache and reloads all plans from disk",
+        "operationId": "refreshCache",
+        "responses": {
+          "200": {
+            "description": "Cache refreshed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/open": {
+      "post": {
+        "summary": "Open plan in editor",
+        "description": "Opens the specified plan file in the system's default editor",
+        "operationId": "openInEditor",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["filepath"],
+                "properties": {
+                  "filepath": {
+                    "type": "string",
+                    "description": "Absolute path to the plan file"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File opened successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid path"
+          },
+          "500": {
+            "description": "Failed to open file"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PlanMetadata": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Plan filename (e.g., my-plan.md)"
+          },
+          "filepath": {
+            "type": "string",
+            "description": "Absolute path to the plan file"
+          },
+          "title": {
+            "type": "string",
+            "description": "Plan title extracted from markdown heading"
+          },
+          "size": {
+            "type": "integer",
+            "description": "File size in bytes"
+          },
+          "modified": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last modification timestamp"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation timestamp"
+          },
+          "lineCount": {
+            "type": "integer",
+            "description": "Number of lines in the plan"
+          },
+          "wordCount": {
+            "type": "integer",
+            "description": "Number of words in the plan"
+          },
+          "project": {
+            "type": "string",
+            "nullable": true,
+            "description": "Associated Claude Code project name"
+          },
+          "sessionId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Associated Claude Code session ID"
+          }
+        }
+      }
+    }
+  }
+}

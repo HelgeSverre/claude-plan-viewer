@@ -272,48 +272,67 @@ async function buildProjectMapping(): Promise<ProjectMapping> {
   try {
     const projectDirs = await readdir(PROJECTS_DIR);
 
-    for (const dir of projectDirs) {
-      const dirPath = join(PROJECTS_DIR, dir);
-      const dirStats = await stat(dirPath);
-      if (!dirStats.isDirectory()) continue;
-
-      // Find JSONL files and extract cwd + slugs + sessionIds
-      const files = await readdir(dirPath);
-      const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
-
-      let projectName: string | null = null;
-      const slugSessionMap = new Map<string, string>();
-
-      for (const file of jsonlFiles) {
+    // Process all project directories in parallel
+    const results = await Promise.all(
+      projectDirs.map(async (dir) => {
+        const dirPath = join(PROJECTS_DIR, dir);
         try {
-          const content = await Bun.file(join(dirPath, file)).text();
+          const dirStats = await stat(dirPath);
+          if (!dirStats.isDirectory()) return null;
 
-          // Get project name from cwd (only need to find it once)
-          if (!projectName) {
-            const cwd = extractCwdFromJsonl(content);
-            if (cwd) {
-              projectName = extractProjectName(cwd);
+          // Find JSONL files
+          const files = await readdir(dirPath);
+          const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
+          if (jsonlFiles.length === 0) return null;
+
+          // Read all JSONL files in parallel
+          const fileContents = await Promise.all(
+            jsonlFiles.map(async (file) => {
+              try {
+                return await Bun.file(join(dirPath, file)).text();
+              } catch {
+                return null;
+              }
+            })
+          );
+
+          let projectName: string | null = null;
+          const slugSessionMap = new Map<string, string>();
+
+          // Process file contents
+          for (const content of fileContents) {
+            if (!content) continue;
+
+            // Get project name from cwd (only need to find it once)
+            if (!projectName) {
+              const cwd = extractCwdFromJsonl(content);
+              if (cwd) {
+                projectName = extractProjectName(cwd);
+              }
+            }
+
+            // Collect slug -> sessionId mappings
+            const fileSlugSessions = extractSlugSessionMap(content);
+            for (const [slug, sessionId] of fileSlugSessions) {
+              slugSessionMap.set(slug, sessionId);
             }
           }
 
-          // Collect slug -> sessionId mappings
-          const fileSlugSessions = extractSlugSessionMap(content);
-          for (const [slug, sessionId] of fileSlugSessions) {
-            slugSessionMap.set(slug, sessionId);
-          }
+          return { projectName, slugSessionMap };
         } catch {
-          // Skip files that can't be read
+          return null;
         }
-      }
+      })
+    );
 
-      // Map all slugs to this project with their session IDs
-      if (projectName) {
-        for (const [slug, sessionId] of slugSessionMap) {
-          mapping[slug] = {
-            project: projectName,
-            sessionId: sessionId,
-          };
-        }
+    // Merge results into mapping
+    for (const result of results) {
+      if (!result?.projectName) continue;
+      for (const [slug, sessionId] of result.slugSessionMap) {
+        mapping[slug] = {
+          project: result.projectName,
+          sessionId: sessionId,
+        };
       }
     }
   } catch {
@@ -380,10 +399,27 @@ async function loadPlans(): Promise<PlanMetadata[]> {
   return plans;
 }
 
-function invalidateCache() {
+// Granular cache invalidation
+function invalidatePlansCache() {
   cachedPlans = null;
+}
+
+function invalidateProjectMapping() {
   cachedProjectMapping = null;
-  contentCache.clear();
+}
+
+function invalidateContentCache(filename?: string) {
+  if (filename) {
+    contentCache.delete(filename);
+  } else {
+    contentCache.clear();
+  }
+}
+
+function invalidateAllCaches() {
+  invalidatePlansCache();
+  invalidateProjectMapping();
+  invalidateContentCache();
 }
 
 // Watch plans directory for changes and invalidate cache
@@ -392,7 +428,10 @@ async function watchPlansDirectory() {
     const watcher = watch(PLANS_DIR);
     for await (const event of watcher) {
       if (event.filename?.endsWith(".md")) {
-        invalidateCache();
+        // Only invalidate plans metadata and the specific file's content
+        // Project mapping rarely changes, keep it cached
+        invalidatePlansCache();
+        invalidateContentCache(event.filename);
       }
     }
   } catch {
@@ -470,7 +509,7 @@ async function startServer() {
       "/api/refresh": {
         POST: async () => {
           const before = cachedPlans?.length ?? 0;
-          invalidateCache();
+          invalidateAllCaches();
           await loadPlans();
           const after = cachedPlans?.length ?? 0;
           return Response.json({ success: true, before, after });

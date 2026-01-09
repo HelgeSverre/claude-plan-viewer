@@ -30,14 +30,6 @@ export function formatFullDate(iso: string): string {
   });
 }
 
-export function formatDateISO(iso: string): string {
-  const d = new Date(iso);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + " B";
   return (bytes / 1024).toFixed(1) + " KB";

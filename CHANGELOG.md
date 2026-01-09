@@ -8,6 +8,8 @@
 - Switched to Atom Dark syntax highlighting theme
 - Increased code font size to 13px for better readability
 - Refresh button now shows animated spinner while loading
+- Compact metadata display: relative time first, then "Jan 7 · 03:30" format
+- Created date only shown when different from modified date
 
 ### Added
 
@@ -16,6 +18,13 @@
 - CLI flag takes precedence over environment variable when both are set
 - Extended syntax highlighting support: C, C++, C#, Java, PHP, Ruby, Rust, YAML, Markdown, Diff, Docker, JSX, TSX, SCSS
 - API now returns before/after plan counts on refresh for smarter UI updates
+- Focus trapping in modals for improved keyboard accessibility
+- Click-to-copy filepath button in detail metadata
+
+### Fixed
+
+- Granular cache invalidation: plan file changes no longer rebuild project mapping
+- Parallelized project directory scanning (~2x faster initial load)
 
 ## [1.3.0] - 2025-01-08
 

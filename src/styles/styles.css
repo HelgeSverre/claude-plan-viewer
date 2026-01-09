@@ -392,6 +392,8 @@ body {
 .table-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .table-container::-webkit-scrollbar {
@@ -763,11 +765,15 @@ tr.selected .title-btn {
   padding: 2px 6px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 10px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .detail-meta .filename-tag:hover {
@@ -895,10 +901,16 @@ tr.selected .title-btn {
   overflow: hidden;
 }
 
+.markdown-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 12px;
+}
+
 .markdown table {
   width: 100%;
+  min-width: max-content;
   border-collapse: collapse;
-  margin-bottom: 12px;
   font-size: 12px;
 }
 

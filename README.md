@@ -153,11 +153,12 @@ bun run index.ts -- --from-file plans.json
 ## Running tests
 
 ```bash
-bun run test
-
-# Note: Use `bun run test` instead of `bun test` directly,
-# as the script specifies the test directory path
+bun run test          # Run all unit tests
+bun run test:api      # Run API tests only
+bun run test:e2e      # Run Playwright E2E tests
 ```
+
+Note: Use `bun run test` instead of `bun test` directly, as the script specifies the test directory path.
 
 ## Building
 
@@ -171,6 +172,22 @@ bun run build:macos-x64    # macOS Intel
 bun run build:linux-x64    # Linux x64
 bun run build:linux-arm64  # Linux ARM64
 bun run build:windows      # Windows x64
+bun run clean              # Remove dist folder
+```
+
+## Local Development
+
+```bash
+# Link package globally for development
+bun run install:link       # Create global symlink
+bun run uninstall:link     # Remove global symlink
+
+# Install/uninstall locally
+bun run install:local      # Install binary locally
+bun run uninstall:local    # Remove local installation
+
+# Format code
+bun run format             # Format source files with Prettier
 ```
 
 ## Requirements

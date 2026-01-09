@@ -2,7 +2,7 @@ import { type RefObject, useEffect, useRef } from "react";
 
 export function useFocusTrap(
   containerRef: RefObject<HTMLElement | null>,
-  isOpen: boolean
+  isOpen: boolean,
 ) {
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
@@ -18,10 +18,10 @@ export function useFocusTrap(
       if (!container) return [];
       return Array.from(
         container.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
       ).filter(
-        (el) => !el.hasAttribute("disabled") && el.offsetParent !== null
+        (el) => !el.hasAttribute("disabled") && el.offsetParent !== null,
       );
     };
 

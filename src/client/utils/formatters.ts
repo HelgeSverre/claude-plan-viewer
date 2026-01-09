@@ -42,3 +42,36 @@ export function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + " B";
   return (bytes / 1024).toFixed(1) + " KB";
 }
+
+export function formatCompactDateTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+
+  const time = d.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const dateOpts: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+  };
+  if (d.getFullYear() !== now.getFullYear()) {
+    dateOpts.year = "numeric";
+  }
+
+  const date = d.toLocaleDateString("en-US", dateOpts);
+  return `${date} · ${time}`;
+}
+
+export function isSameDay(iso1: string, iso2: string): boolean {
+  const d1 = new Date(iso1);
+  const d2 = new Date(iso2);
+  return d1.toDateString() === d2.toDateString();
+}
+
+export function formatCreatedShort(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}

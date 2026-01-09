@@ -1,10 +1,5 @@
 import { escapeHtml } from "./strings.ts";
-
-// Prism.js is loaded from CDN
-declare const Prism: {
-  highlight: (code: string, grammar: unknown, language: string) => string;
-  languages: Record<string, unknown>;
-};
+import Prism from "./prism.ts";
 
 export function renderMarkdown(content: string): string {
   // First, extract and process code blocks before escaping
@@ -25,14 +20,17 @@ export function renderMarkdown(content: string): string {
       const block = `<pre class="language-${language}"><code class="language-${language}">${highlighted}</code></pre>`;
       codeBlocks.push(block);
       return `\x00CODE_BLOCK_${codeBlocks.length - 1}\x00`;
-    }
+    },
   );
 
   // Now escape the rest
   let html = escapeHtml(processed);
 
   // Restore code blocks
-  html = html.replace(/\x00CODE_BLOCK_(\d+)\x00/g, (_, idx) => codeBlocks[parseInt(idx)]);
+  html = html.replace(
+    /\x00CODE_BLOCK_(\d+)\x00/g,
+    (_, idx) => codeBlocks[parseInt(idx)],
+  );
 
   // Inline code
   html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
@@ -78,17 +76,17 @@ export function renderMarkdown(content: string): string {
         })
         .join("");
       return `<table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table>`;
-    }
+    },
   );
 
   // Checkbox lists
   html = html.replace(
     /^- \[x\] (.+)$/gm,
-    '<li><input type="checkbox" checked disabled> $1</li>'
+    '<li><input type="checkbox" checked disabled> $1</li>',
   );
   html = html.replace(
     /^- \[ \] (.+)$/gm,
-    '<li><input type="checkbox" disabled> $1</li>'
+    '<li><input type="checkbox" disabled> $1</li>',
   );
 
   // Regular lists

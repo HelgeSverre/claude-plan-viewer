@@ -71,22 +71,19 @@ export function usePlans(params: UsePlansParams = {}): UsePlansReturn {
     }
   }, [mutate]);
 
-  const ensureContent = useCallback(
-    async (plan: Plan): Promise<Plan> => {
-      if (plan.content) return plan;
+  const ensureContent = useCallback(async (plan: Plan): Promise<Plan> => {
+    if (plan.content) return plan;
 
-      // Check cache
-      const cached = contentCache.current.get(plan.filename);
-      if (cached) {
-        return { ...plan, content: cached };
-      }
+    // Check cache
+    const cached = contentCache.current.get(plan.filename);
+    if (cached) {
+      return { ...plan, content: cached };
+    }
 
-      const content = await fetchPlanContent(plan.filename);
-      contentCache.current.set(plan.filename, content);
-      return { ...plan, content };
-    },
-    [],
-  );
+    const content = await fetchPlanContent(plan.filename);
+    contentCache.current.set(plan.filename, content);
+    return { ...plan, content };
+  }, []);
 
   // Client-side filtering
   const filteredPlans = useMemo(() => {

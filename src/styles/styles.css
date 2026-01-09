@@ -752,6 +752,35 @@ tr.selected .title-btn {
   color: var(--text-secondary);
 }
 
+.detail-meta .created-date {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.detail-meta .filename-tag {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.detail-meta .filename-tag:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+.detail-meta .filename-tag:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
 .detail-content {
   flex: 1;
   overflow-y: auto;

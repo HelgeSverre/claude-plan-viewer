@@ -30,11 +30,8 @@ export function HelpModal({ onClose }: HelpModalProps) {
   }, [handleKeyDown]);
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal-content help-modal"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal help-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Keyboard Shortcuts</h3>
           <button className="btn btn-secondary" onClick={onClose}>

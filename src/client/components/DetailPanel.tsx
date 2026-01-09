@@ -1,8 +1,9 @@
 import type { Plan } from "../types.ts";
 import {
-  formatFullDate,
-  formatDateISO,
-  formatSize,
+  formatDate,
+  formatCompactDateTime,
+  formatCreatedShort,
+  isSameDay,
 } from "../utils/formatters.ts";
 import { Markdown } from "./Markdown.tsx";
 
@@ -11,6 +12,7 @@ interface DetailPanelProps {
   onOpenEditor: () => void;
   onToggleOverlay: () => void;
   onCopySession: (sessionId: string) => void;
+  onCopyFilepath: (filepath: string) => void;
   onCopyPlan: () => void;
   copied: boolean;
 }
@@ -20,6 +22,7 @@ export function DetailPanel({
   onOpenEditor,
   onToggleOverlay,
   onCopySession,
+  onCopyFilepath,
   onCopyPlan,
   copied,
 }: DetailPanelProps) {
@@ -91,12 +94,21 @@ export function DetailPanel({
         </div>
 
         <div className="detail-meta">
-          <span title={plan.modified}>
-            Modified: {formatFullDate(plan.modified)}
-          </span>
-          <span>Created: {formatDateISO(plan.created)}</span>
-
+          <span title={plan.modified}>{formatDate(plan.modified)}</span>
+          <span>{formatCompactDateTime(plan.modified)}</span>
+          {!isSameDay(plan.modified, plan.created) && (
+            <span className="created-date">
+              (created {formatCreatedShort(plan.created)})
+            </span>
+          )}
           <span>{plan.wordCount} words</span>
+          <button
+            className="filename-tag"
+            onClick={() => onCopyFilepath(plan.filepath)}
+            title={`Click to copy: ${plan.filepath}`}
+          >
+            {plan.filename}
+          </button>
           {plan.project && (
             <span className="project-badge">{plan.project}</span>
           )}

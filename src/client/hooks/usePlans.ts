@@ -1,4 +1,4 @@
-import { useCallback, useRef, useMemo } from "react";
+import { useCallback, useRef, useMemo, useState } from "react";
 import useSWR from "swr";
 import type { Plan, SortKey, SortDir, PlanMetadata } from "../types.ts";
 import { fetchPlanContent, refreshCache } from "../utils/api.ts";
@@ -31,12 +31,12 @@ const plansFetcher = async (url: string): Promise<PlanMetadata[]> => {
 export function usePlans(params: UsePlansParams = {}): UsePlansReturn {
   // Cache content by filename to persist across filter changes
   const contentCache = useRef<Map<string, string>>(new Map());
+  const [refreshing, setRefreshing] = useState(false);
 
   const {
     data: fetchedPlans,
     isLoading: loading,
     mutate,
-    isValidating: refreshing,
   } = useSWR<PlanMetadata[]>("/api/plans", plansFetcher, {
     onErrorRetry: (error, _key, _config, revalidate, { retryCount }) => {
       // Don't retry on 4xx errors
@@ -58,11 +58,16 @@ export function usePlans(params: UsePlansParams = {}): UsePlansReturn {
   }, [fetchedPlans]);
 
   const refresh = useCallback(async () => {
-    contentCache.current.clear();
-    const { before, after } = await refreshCache();
-    // Only reload if count changed
-    if (before !== after) {
-      await mutate();
+    setRefreshing(true);
+    try {
+      contentCache.current.clear();
+      const { before, after } = await refreshCache();
+      // Only reload if count changed
+      if (before !== after) {
+        await mutate();
+      }
+    } finally {
+      setRefreshing(false);
     }
   }, [mutate]);
 

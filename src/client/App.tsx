@@ -84,6 +84,11 @@ export function App() {
     navigator.clipboard.writeText(`claude --resume ${sessionId}`);
   }, []);
 
+  // Copy filepath
+  const handleCopyFilepath = useCallback((filepath: string) => {
+    navigator.clipboard.writeText(filepath);
+  }, []);
+
   // Copy plan content
   const handleCopyPlan = useCallback(() => {
     if (selectedPlan?.content) {
@@ -191,6 +196,7 @@ export function App() {
         onOpenEditor={handleOpenEditor}
         onToggleOverlay={() => setShowOverlay(true)}
         onCopySession={handleCopySession}
+        onCopyFilepath={handleCopyFilepath}
         onCopyPlan={handleCopyPlan}
         copied={copied}
       />

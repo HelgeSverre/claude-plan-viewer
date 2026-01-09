@@ -52,6 +52,15 @@ export function App() {
   // Load content when plan is selected
   const handleSelectPlan = useCallback(
     async (plan: Plan | null) => {
+      // Update URL query parameter
+      const url = new URL(window.location.href);
+      if (plan) {
+        url.searchParams.set("plan", plan.filename);
+      } else {
+        url.searchParams.delete("plan");
+      }
+      window.history.replaceState({}, "", url.toString());
+
       if (plan) {
         const withContent = await ensureContent(plan);
         setSelectedPlan(withContent);
@@ -92,13 +101,25 @@ export function App() {
     onClearSearch: handleClearSearch,
   });
 
-  // Auto-select first plan when plans change
+  // Select plan from URL or auto-select first plan
   useEffect(() => {
-    if (!selectedPlan && plans.length > 0) {
-      const firstPlan = plans[0];
-      if (firstPlan) {
-        handleSelectPlan(firstPlan);
+    if (plans.length === 0) return;
+
+    // Check URL for plan parameter
+    const url = new URL(window.location.href);
+    const planFromUrl = url.searchParams.get("plan");
+
+    if (planFromUrl) {
+      const matchingPlan = plans.find((p) => p.filename === planFromUrl);
+      if (matchingPlan && selectedPlan?.filename !== planFromUrl) {
+        handleSelectPlan(matchingPlan);
+        return;
       }
+    }
+
+    // Fall back to selecting first plan if nothing selected
+    if (!selectedPlan) {
+      handleSelectPlan(plans[0]);
     }
   }, [plans, selectedPlan, handleSelectPlan]);
 

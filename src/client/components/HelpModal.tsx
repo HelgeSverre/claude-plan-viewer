@@ -21,7 +21,7 @@ export function HelpModal({ onClose }: HelpModalProps) {
         onClose();
       }
     },
-    [onClose]
+    [onClose],
   );
 
   useEffect(() => {
@@ -31,7 +31,10 @@ export function HelpModal({ onClose }: HelpModalProps) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content help-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-content help-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h3>Keyboard Shortcuts</h3>
           <button className="btn btn-secondary" onClick={onClose}>

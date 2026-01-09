@@ -9,7 +9,12 @@ interface PlanRowProps {
   onSelect: (plan: Plan) => void;
 }
 
-export function PlanRow({ plan, selected, searchQuery, onSelect }: PlanRowProps) {
+export function PlanRow({
+  plan,
+  selected,
+  searchQuery,
+  onSelect,
+}: PlanRowProps) {
   return (
     <tr
       className={selected ? "selected" : ""}
@@ -22,14 +27,18 @@ export function PlanRow({ plan, selected, searchQuery, onSelect }: PlanRowProps)
           data-filename={plan.filename}
           title={plan.title}
           dangerouslySetInnerHTML={{
-            __html: searchQuery ? highlightText(plan.title, searchQuery) : plan.title,
+            __html: searchQuery
+              ? highlightText(plan.title, searchQuery)
+              : plan.title,
           }}
         />
       </td>
       <td className="filename-cell">
         <span
           dangerouslySetInnerHTML={{
-            __html: searchQuery ? highlightText(plan.filename, searchQuery) : plan.filename,
+            __html: searchQuery
+              ? highlightText(plan.filename, searchQuery)
+              : plan.filename,
           }}
         />
       </td>
@@ -37,7 +46,9 @@ export function PlanRow({ plan, selected, searchQuery, onSelect }: PlanRowProps)
         {plan.project ? (
           <span
             dangerouslySetInnerHTML={{
-              __html: searchQuery ? highlightText(plan.project, searchQuery) : plan.project,
+              __html: searchQuery
+                ? highlightText(plan.project, searchQuery)
+                : plan.project,
             }}
           />
         ) : (

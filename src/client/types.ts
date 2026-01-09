@@ -15,5 +15,11 @@ export interface Plan extends PlanMetadata {
   content?: string; // Lazy-loaded on demand
 }
 
-export type SortKey = "title" | "project" | "modified" | "size" | "lines" | "created";
+export type SortKey =
+  | "title"
+  | "project"
+  | "modified"
+  | "size"
+  | "lines"
+  | "created";
 export type SortDir = "asc" | "desc";

@@ -5,7 +5,7 @@ export * from "./api.ts";
 
 export function debounce<Args extends unknown[]>(
   fn: (...args: Args) => void,
-  ms: number
+  ms: number,
 ): (...args: Args) => void {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   return (...args: Args) => {

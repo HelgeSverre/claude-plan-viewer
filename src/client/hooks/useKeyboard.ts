@@ -35,7 +35,7 @@ export function useKeyboard({
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
         const idx = plans.findIndex(
-          (p) => p.filename === selectedPlan?.filename
+          (p) => p.filename === selectedPlan?.filename,
         );
         let newIdx = e.key === "ArrowDown" ? idx + 1 : idx - 1;
         if (newIdx < 0) newIdx = 0;
@@ -104,7 +104,7 @@ export function useKeyboard({
       onToggleHelp,
       onToggleOverlay,
       onClearSearch,
-    ]
+    ],
   );
 
   useEffect(() => {

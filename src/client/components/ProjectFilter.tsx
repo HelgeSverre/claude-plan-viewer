@@ -20,11 +20,9 @@ export function ProjectFilter({
     .map((p) => ({ value: p, label: p }));
 
   const handleChange = (
-    newValue: MultiValue<{ value: string; label: string }> | null
+    newValue: MultiValue<{ value: string; label: string }> | null,
   ) => {
-    const selectedSet = new Set(
-      (newValue ?? []).map((option) => option.value)
-    );
+    const selectedSet = new Set((newValue ?? []).map((option) => option.value));
 
     projects.forEach((project) => {
       const isSelected = selectedSet.has(project);
@@ -36,10 +34,7 @@ export function ProjectFilter({
   };
 
   const customStyles = {
-    control: (
-      base: object,
-      state: { isFocused: boolean }
-    ) => ({
+    control: (base: object, state: { isFocused: boolean }) => ({
       ...base,
       background: "var(--bg-tertiary)",
       border: "1px solid var(--border)",
@@ -100,14 +95,14 @@ export function ProjectFilter({
     }),
     option: (
       base: object,
-      state: { isSelected: boolean; isFocused: boolean }
+      state: { isSelected: boolean; isFocused: boolean },
     ) => ({
       ...base,
       background: state.isSelected
         ? "var(--accent-dim)"
         : state.isFocused
-        ? "var(--bg-hover)"
-        : "transparent",
+          ? "var(--bg-hover)"
+          : "transparent",
       color: "var(--text-primary)",
       fontSize: "12px",
       cursor: "pointer",

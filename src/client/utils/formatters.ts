@@ -10,7 +10,11 @@ export function formatDate(iso: string): string {
 
   // Show year if not current year
   if (d.getFullYear() !== now.getFullYear()) {
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   }
 
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });

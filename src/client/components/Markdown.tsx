@@ -8,9 +8,6 @@ export function Markdown({ content }: MarkdownProps) {
   const html = renderMarkdown(content);
 
   return (
-    <div
-      className="markdown"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <div className="markdown" dangerouslySetInnerHTML={{ __html: html }} />
   );
 }

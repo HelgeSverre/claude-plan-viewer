@@ -171,14 +171,16 @@ describe("GET /api/projects", () => {
 // ============================================================================
 
 describe("POST /api/refresh", () => {
-  test("returns 200 with success true", async () => {
+  test("returns 200 with success true and before/after counts", async () => {
     const response = await fetch(`${BASE_URL}/api/refresh`, {
       method: "POST",
     });
     expect(response.status).toBe(200);
 
     const data = await response.json();
-    expect(data).toEqual({ success: true });
+    expect(data.success).toBe(true);
+    expect(typeof data.before).toBe("number");
+    expect(typeof data.after).toBe("number");
   });
 
   test("GET request returns 404 (POST only)", async () => {

@@ -55,16 +55,19 @@
     "@types/bun": "latest",
     "@types/prismjs": "^1.26.5",
     "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3"
+    "@types/react-dom": "^19.2.3",
+    "@types/react-syntax-highlighter": "^15.5.13"
   },
   "peerDependencies": {
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "prism-themes": "^1.9.0",
-    "prismjs": "^1.30.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "react-select": "^5.10.2"
+    "react-markdown": "^10.1.0",
+    "react-select": "^5.10.2",
+    "react-syntax-highlighter": "^16.1.0",
+    "remark-gfm": "^4.0.1",
+    "swr": "^2.3.8"
   }
 }

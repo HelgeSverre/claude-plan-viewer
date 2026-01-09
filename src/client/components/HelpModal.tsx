@@ -1,4 +1,5 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 interface HelpModalProps {
   onClose: () => void;
@@ -14,6 +15,9 @@ const SHORTCUTS = [
 ];
 
 export function HelpModal({ onClose }: HelpModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, true);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.key === "?") {
@@ -31,9 +35,16 @@ export function HelpModal({ onClose }: HelpModalProps) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal help-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={modalRef}
+        className="modal help-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="help-modal-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
-          <h3>Keyboard Shortcuts</h3>
+          <h3 id="help-modal-title">Keyboard Shortcuts</h3>
           <button className="modal-close" onClick={onClose} title="Close (Esc)">
             <svg
               width="14"

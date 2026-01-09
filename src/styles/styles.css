@@ -746,6 +746,12 @@ tr.selected .title-btn {
   border-color: var(--accent);
 }
 
+.detail-meta .session-tag:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+  color: var(--text-secondary);
+}
+
 .detail-content {
   flex: 1;
   overflow-y: auto;
@@ -839,7 +845,10 @@ tr.selected .title-btn {
   margin-bottom: 0;
 }
 
-.markdown code {
+/* Inline code only - exclude code blocks rendered by react-syntax-highlighter */
+.markdown > p code,
+.markdown > li code,
+.markdown > blockquote code {
   background: var(--bg-tertiary);
   padding: 1px 5px;
   border-radius: 4px;
@@ -850,21 +859,11 @@ tr.selected .title-btn {
   border: 1px solid var(--border);
 }
 
-.markdown pre {
-  background: var(--bg-tertiary);
-  padding: 12px 14px;
-  border-radius: 6px;
-  overflow-x: auto;
+/* Code blocks from react-syntax-highlighter */
+.markdown > div {
   margin-bottom: 12px;
-  border: 1px solid var(--border);
-  line-height: 1.4;
-}
-
-.markdown pre code {
-  background: transparent;
-  padding: 0;
-  border: none;
-  font-size: 13px;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .markdown table {

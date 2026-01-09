@@ -409,6 +409,7 @@ async function startServer() {
     port,
     routes: {
       "/": index,
+      "/api": () => Response.redirect("/api/", 301),
       "/api/": apiDocs,
       "/api/openapi.json": () => Response.json(openapi),
       "/api/projects": async () => {

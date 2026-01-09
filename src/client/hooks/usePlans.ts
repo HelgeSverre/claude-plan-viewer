@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import type { Plan, SortKey, SortDir } from "../types.ts";
-import { fetchPlans, fetchPlanContent, refreshCache } from "../utils/api.ts";
+import { useCallback, useRef, useMemo } from "react";
+import useSWR from "swr";
+import type { Plan, SortKey, SortDir, PlanMetadata } from "../types.ts";
+import { fetchPlanContent, refreshCache } from "../utils/api.ts";
 
 export interface UsePlansParams {
   q?: string;
@@ -18,89 +19,69 @@ interface UsePlansReturn {
   ensureContent: (plan: Plan) => Promise<Plan>;
 }
 
-export function usePlans(params: UsePlansParams = {}): UsePlansReturn {
-  const [allPlans, setAllPlans] = useState<Plan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+const plansFetcher = async (url: string): Promise<PlanMetadata[]> => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch plans: ${res.statusText}`);
+  }
+  const data = await res.json();
+  return data.plans;
+};
 
+export function usePlans(params: UsePlansParams = {}): UsePlansReturn {
   // Cache content by filename to persist across filter changes
   const contentCache = useRef<Map<string, string>>(new Map());
 
-  const loadAllPlans = useCallback(async () => {
-    // Cancel previous request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
+  const {
+    data: fetchedPlans,
+    isLoading: loading,
+    mutate,
+    isValidating: refreshing,
+  } = useSWR<PlanMetadata[]>("/api/plans", plansFetcher, {
+    onErrorRetry: (error, _key, _config, revalidate, { retryCount }) => {
+      // Don't retry on 4xx errors
+      if (error.status >= 400 && error.status < 500) return;
+      // Retry up to 5 times on network errors with exponential backoff
+      if (retryCount >= 5) return;
+      setTimeout(() => revalidate({ retryCount }), 500 * (retryCount + 1));
+    },
+    revalidateOnFocus: false,
+  });
 
-    try {
-      setLoading(true);
-      const fetchedPlans = await fetchPlans(abortControllerRef.current.signal);
-
-      // Restore cached content
-      const plansWithContent = fetchedPlans.map((p) => ({
-        ...p,
-        content: contentCache.current.get(p.filename),
-      }));
-
-      setAllPlans(plansWithContent);
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        return;
-      }
-      console.error("Failed to load plans:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Load all plans on mount and when parameters change
-  useEffect(() => {
-    loadAllPlans();
-    return () => {
-      abortControllerRef.current?.abort();
-    };
-  }, [loadAllPlans]);
+  // Merge fetched plans with cached content
+  const allPlans = useMemo(() => {
+    if (!fetchedPlans) return [];
+    return fetchedPlans.map((p) => ({
+      ...p,
+      content: contentCache.current.get(p.filename),
+    }));
+  }, [fetchedPlans]);
 
   const refresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      contentCache.current.clear();
-      const { before, after } = await refreshCache();
-      // Only reload if count changed
-      if (before !== after) {
-        await loadAllPlans();
+    contentCache.current.clear();
+    const { before, after } = await refreshCache();
+    // Only reload if count changed
+    if (before !== after) {
+      await mutate();
+    }
+  }, [mutate]);
+
+  const ensureContent = useCallback(
+    async (plan: Plan): Promise<Plan> => {
+      if (plan.content) return plan;
+
+      // Check cache
+      const cached = contentCache.current.get(plan.filename);
+      if (cached) {
+        return { ...plan, content: cached };
       }
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadAllPlans]);
 
-  const ensureContent = useCallback(async (plan: Plan): Promise<Plan> => {
-    if (plan.content) return plan;
-
-    // Check cache
-    const cached = contentCache.current.get(plan.filename);
-    if (cached) {
-      const updatedPlan = { ...plan, content: cached };
-      setAllPlans((prev) =>
-        prev.map((p) => (p.filename === plan.filename ? updatedPlan : p)),
-      );
-      return updatedPlan;
-    }
-
-    const content = await fetchPlanContent(plan.filename);
-    contentCache.current.set(plan.filename, content);
-    const updatedPlan = { ...plan, content };
-
-    // Update in state
-    setAllPlans((prev) =>
-      prev.map((p) => (p.filename === plan.filename ? updatedPlan : p)),
-    );
-
-    return updatedPlan;
-  }, []);
+      const content = await fetchPlanContent(plan.filename);
+      contentCache.current.set(plan.filename, content);
+      return { ...plan, content };
+    },
+    [],
+  );
 
   // Client-side filtering
   const filteredPlans = useMemo(() => {

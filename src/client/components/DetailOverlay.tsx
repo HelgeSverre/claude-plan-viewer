@@ -1,4 +1,5 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import type { Plan } from "../types.ts";
 import { formatFullDate, formatSize } from "../utils/formatters.ts";
 import { Markdown } from "./Markdown.tsx";
@@ -20,6 +21,9 @@ export function DetailOverlay({
   onCopyPlan,
   copied,
 }: DetailOverlayProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, true);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.key === "f") {
@@ -48,7 +52,11 @@ export function DetailOverlay({
       onClick={onClose}
     >
       <div
+        ref={panelRef}
         className="detail-overlay-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="detail-overlay-title"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="detail-overlay-bar">
@@ -56,7 +64,7 @@ export function DetailOverlay({
             {plan.project && (
               <span className="project-tag">{plan.project}</span>
             )}
-            <span>{plan.filename}</span>
+            <span id="detail-overlay-title">{plan.filename}</span>
             <span>{formatFullDate(plan.modified)}</span>
             <span>{formatSize(plan.size)}</span>
             <span>{plan.lineCount} lines</span>

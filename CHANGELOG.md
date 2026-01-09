@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.1] - 2026-01-09
+
+### Fixed
+
+- Include `openapi.json` in npm package (was missing, causing `bunx`/`npx` to fail)
+
 ## [1.4.0] - 2026-01-09
 
 ### Changed

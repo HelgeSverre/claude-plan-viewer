@@ -30,6 +30,13 @@ export function Markdown({ content }: MarkdownProps) {
               </code>
             );
           },
+          table({ children, ...props }) {
+            return (
+              <div className="markdown-table-wrapper">
+                <table {...props}>{children}</table>
+              </div>
+            );
+          },
         }}
       >
         {content}

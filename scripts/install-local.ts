@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Cross-platform script to compile and install the plans-viewer binary locally.
+ * Cross-platform script to compile and install the claude-plan-viewer binary locally.
  * Installs to:
  * - macOS/Linux: ~/.local/bin/
  * - Windows: %LOCALAPPDATA%\Programs\
@@ -11,14 +11,14 @@ import { homedir, platform } from "os";
 import { copyFile, chmod, mkdir } from "fs/promises";
 
 const plat = platform();
-const binName = plat === "win32" ? "plans-viewer.exe" : "plans-viewer";
+const binName = plat === "win32" ? "claude-plan-viewer.exe" : "claude-plan-viewer";
 
 // Determine install directory
 const installDir = plat === "win32"
   ? join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "Programs")
   : join(homedir(), ".local", "bin");
 
-console.log("Building plans-viewer...");
+console.log("Building claude-plan-viewer...");
 await $`bun run build`;
 
 console.log(`Installing to ${installDir}...`);
@@ -45,7 +45,7 @@ const isInPath = pathDirs.some(dir => dir === installDir);
 
 if (!isInPath) {
   console.log();
-  console.log(`Add ${installDir} to your PATH to run 'plans-viewer' from anywhere.`);
+  console.log(`Add ${installDir} to your PATH to run 'claude-plan-viewer' from anywhere.`);
   if (plat === "darwin" || plat === "linux") {
     console.log(`  export PATH="$PATH:${installDir}"`);
   }

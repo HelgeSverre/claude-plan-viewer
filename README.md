@@ -52,7 +52,7 @@ Download a pre-built binary from the [releases page](https://github.com/HelgeSve
 
 ```bash
 bun run build
-./dist/plans-viewer
+./dist/claude-plan-viewer
 ```
 
 The binary is fully self-contained (~57MB) and works offline.
@@ -72,15 +72,15 @@ The server will automatically find an available port if the requested port is in
 
 ### CLI Options
 
-| Flag                   | Short | Description                                               |
-| ---------------------- | ----- | --------------------------------------------------------- |
-| `--port <number>`      | `-p`  | Port to start the server on (default: 3000)               |
-| `--claude-dir <path>`  | `-c`  | Path to `.claude` directory (default: `~/.claude`)        |
-| `--json`               | `-j`  | Export all plans as JSON and exit                         |
-| `--output <file>`      | `-o`  | Output file for JSON export (prints to stdout if omitted) |
-| `--from-file <file>`   | `-f`  | Load plans from a JSON file instead of `~/.claude/plans`  |
-| `--version`            | `-v`  | Show version number                                       |
-| `--help`               | `-h`  | Show help message                                         |
+| Flag                  | Short | Description                                               |
+| --------------------- | ----- | --------------------------------------------------------- |
+| `--port <number>`     | `-p`  | Port to start the server on (default: 3000)               |
+| `--claude-dir <path>` | `-c`  | Path to `.claude` directory (default: `~/.claude`)        |
+| `--json`              | `-j`  | Export all plans as JSON and exit                         |
+| `--output <file>`     | `-o`  | Output file for JSON export (prints to stdout if omitted) |
+| `--from-file <file>`  | `-f`  | Load plans from a JSON file instead of `~/.claude/plans`  |
+| `--version`           | `-v`  | Show version number                                       |
+| `--help`              | `-h`  | Show help message                                         |
 
 The `--claude-dir` option can also be set via the `CLAUDE_DIR` environment variable. CLI flag takes precedence over the environment variable.
 
@@ -124,14 +124,14 @@ This is useful when your Claude Code data is stored in a non-standard location.
 
 The viewer exposes a REST API for programmatic access:
 
-| Endpoint                          | Method | Description                  |
-| --------------------------------- | ------ | ---------------------------- |
-| `/api/plans`                      | GET    | List all plans (metadata)    |
-| `/api/plans/{filename}/content`   | GET    | Get plan markdown content    |
-| `/api/projects`                   | GET    | List all project names       |
-| `/api/refresh`                    | POST   | Force cache refresh          |
-| `/api/open`                       | POST   | Open plan in system editor   |
-| `/api/openapi.json`               | GET    | OpenAPI 3.0 specification    |
+| Endpoint                        | Method | Description                |
+| ------------------------------- | ------ | -------------------------- |
+| `/api/plans`                    | GET    | List all plans (metadata)  |
+| `/api/plans/{filename}/content` | GET    | Get plan markdown content  |
+| `/api/projects`                 | GET    | List all project names     |
+| `/api/refresh`                  | POST   | Force cache refresh        |
+| `/api/open`                     | POST   | Open plan in system editor |
+| `/api/openapi.json`             | GET    | OpenAPI 3.0 specification  |
 
 ## Development
 
@@ -155,7 +155,8 @@ bun run index.ts -- --from-file plans.json
 ```bash
 bun run test
 
-# Note `bun test` does not work beucase [TODO explain why]
+# Note: Use `bun run test` instead of `bun test` directly,
+# as the script specifies the test directory path
 ```
 
 ## Building

@@ -30,7 +30,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
@@ -120,7 +122,9 @@ body {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-sm);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 10px;
   color: rgba(255, 255, 255, 0.4);
   font-weight: 500;
@@ -143,7 +147,9 @@ body {
   font-family: inherit;
   font-size: 12px;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
   appearance: none;
   -webkit-appearance: none;
 }
@@ -177,7 +183,9 @@ body {
   background-repeat: no-repeat;
   background-position: right 8px center;
   background-size: 12px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 .sort-select:hover {
@@ -207,7 +215,10 @@ body {
   font-family: inherit;
   font-size: 10px;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
   outline: none;
   white-space: nowrap;
 }
@@ -371,7 +382,9 @@ body {
 .stat-value {
   font-size: 11px;
   color: var(--text-secondary);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-variant-numeric: tabular-nums;
 }
 
@@ -435,7 +448,9 @@ th .sort-icon {
   display: inline-block;
   margin-left: 4px;
   opacity: 0.4;
-  transition: opacity 0.1s, transform 0.1s;
+  transition:
+    opacity 0.1s,
+    transform 0.1s;
 }
 
 th.sorted .sort-icon {
@@ -515,21 +530,27 @@ tr.selected .title-btn {
 
 .project-cell {
   color: var(--accent);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 11px;
   max-width: 140px;
 }
 
 .filename-cell {
   color: var(--text-secondary);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 11px;
   max-width: 180px;
 }
 
 .meta-cell {
   color: var(--text-secondary);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 11px;
 }
 
@@ -539,7 +560,9 @@ tr.selected .title-btn {
 
 .num-cell {
   color: var(--text-secondary);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 11px;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -551,7 +574,9 @@ tr.selected .title-btn {
 
 .date-cell {
   color: var(--text-muted);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 11px;
   letter-spacing: -0.5px;
   white-space: nowrap;
@@ -590,7 +615,6 @@ tr.selected .title-btn {
   opacity: 0.7;
 }
 
-
 .detail-header {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
@@ -624,12 +648,18 @@ tr.selected .title-btn {
   justify-content: center;
   width: 28px;
   height: 28px;
+  min-width: 28px;
+  max-width: 28px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    background 0.15s,
+    color 0.15s;
   flex-shrink: 0;
   outline: none;
 }
@@ -681,7 +711,9 @@ tr.selected .title-btn {
   color: var(--text-primary);
   padding: 2px 6px;
   border-radius: 4px;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 10px;
 }
 
@@ -691,10 +723,15 @@ tr.selected .title-btn {
   padding: 2px 6px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 10px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .detail-meta .session-tag:hover {
@@ -806,8 +843,10 @@ tr.selected .title-btn {
   background: var(--bg-tertiary);
   padding: 1px 5px;
   border-radius: 4px;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 12px;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 13px;
   border: 1px solid var(--border);
 }
 
@@ -825,7 +864,7 @@ tr.selected .title-btn {
   background: transparent;
   padding: 0;
   border: none;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .markdown table {
@@ -991,7 +1030,10 @@ tr.selected .title-btn {
   transform: translate(110%, 110%) scale(0.96);
   opacity: 0.45;
   filter: grayscale(0.25);
-  transition: transform 320ms, opacity 320ms, filter 320ms;
+  transition:
+    transform 320ms,
+    opacity 320ms,
+    filter 320ms;
   transition-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
 }
 
@@ -1018,7 +1060,6 @@ tr.selected .title-btn {
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
 }
-
 
 .detail-overlay-content {
   flex: 1;
@@ -1055,7 +1096,6 @@ tr.selected .title-btn {
     transform: translateY(0) scale(1);
   }
 }
-
 
 /* Help Modal */
 .modal-backdrop {
@@ -1104,7 +1144,11 @@ tr.selected .title-btn {
   font-size: 16px;
   cursor: pointer;
   line-height: 1;
-  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    background 0.15s,
+    color 0.15s;
   outline: none;
 }
 
@@ -1144,8 +1188,10 @@ tr.selected .title-btn {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 11px;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 
@@ -1153,7 +1199,7 @@ tr.selected .title-btn {
   flex: 1;
   text-align: right;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* Search highlighting */
@@ -1166,8 +1212,12 @@ mark {
 
 /* Refresh loading animation */
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .action-btn.loading .icon {

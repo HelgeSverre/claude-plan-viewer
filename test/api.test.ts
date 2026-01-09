@@ -110,7 +110,7 @@ describe("GET /api/plans/{filename}/content", () => {
 
   test("returns 404 for non-existent plan", async () => {
     const response = await fetch(
-      `${BASE_URL}/api/plans/non-existent-plan-12345.md/content`
+      `${BASE_URL}/api/plans/non-existent-plan-12345.md/content`,
     );
     expect(response.status).toBe(404);
   });
@@ -159,7 +159,7 @@ describe("GET /api/projects", () => {
 
     if (data.projects.length > 1) {
       const sorted = [...data.projects].sort((a: string, b: string) =>
-        a.localeCompare(b)
+        a.localeCompare(b),
       );
       expect(data.projects).toEqual(sorted);
     }

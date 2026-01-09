@@ -11,18 +11,24 @@ describe("extractProjectName", () => {
     // Normalize: handle both / and \ separators
     const normalized = cwd.replace(/\\/g, "/");
     // Remove trailing slash
-    const trimmed = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+    const trimmed = normalized.endsWith("/")
+      ? normalized.slice(0, -1)
+      : normalized;
     // Get last segment
     const lastSlash = trimmed.lastIndexOf("/");
     return lastSlash === -1 ? trimmed : trimmed.slice(lastSlash + 1);
   }
 
   test("macOS: /Users/helge/code/plans-viewer → plans-viewer", () => {
-    expect(extractProjectName("/Users/helge/code/plans-viewer")).toBe("plans-viewer");
+    expect(extractProjectName("/Users/helge/code/plans-viewer")).toBe(
+      "plans-viewer",
+    );
   });
 
   test("macOS: /Users/helge/code/my-cool-app → my-cool-app", () => {
-    expect(extractProjectName("/Users/helge/code/my-cool-app")).toBe("my-cool-app");
+    expect(extractProjectName("/Users/helge/code/my-cool-app")).toBe(
+      "my-cool-app",
+    );
   });
 
   test("macOS: /Users/helge/projects/api → api", () => {
@@ -42,7 +48,9 @@ describe("extractProjectName", () => {
   });
 
   test("Windows: C:\\Users\\name\\projects\\my-app → my-app", () => {
-    expect(extractProjectName("C:\\Users\\name\\projects\\my-app")).toBe("my-app");
+    expect(extractProjectName("C:\\Users\\name\\projects\\my-app")).toBe(
+      "my-app",
+    );
   });
 
   test("trailing slash is handled: /path/to/project/ → project", () => {
@@ -50,7 +58,9 @@ describe("extractProjectName", () => {
   });
 
   test("Windows trailing backslash: C:\\path\\project\\ → project", () => {
-    expect(extractProjectName("C:\\Users\\name\\code\\project\\")).toBe("project");
+    expect(extractProjectName("C:\\Users\\name\\code\\project\\")).toBe(
+      "project",
+    );
   });
 
   test("root path returns empty string: / → ''", () => {
@@ -79,7 +89,8 @@ describe("extractCwdFromJsonl", () => {
   }
 
   test("extracts cwd from valid JSONL line", () => {
-    const content = '{"cwd":"/Users/helge/code/plans-viewer","sessionId":"abc123"}';
+    const content =
+      '{"cwd":"/Users/helge/code/plans-viewer","sessionId":"abc123"}';
     expect(extractCwdFromJsonl(content)).toBe("/Users/helge/code/plans-viewer");
   });
 
@@ -91,7 +102,8 @@ describe("extractCwdFromJsonl", () => {
   });
 
   test("handles Windows paths with escaped backslashes", () => {
-    const content = '{"cwd":"C:\\\\Users\\\\name\\\\code\\\\myapp","sessionId":"123"}';
+    const content =
+      '{"cwd":"C:\\\\Users\\\\name\\\\code\\\\myapp","sessionId":"123"}';
     expect(extractCwdFromJsonl(content)).toBe("C:\\Users\\name\\code\\myapp");
   });
 
@@ -136,7 +148,10 @@ describe("extractSlugsFromJsonl", () => {
     const content = `{"slug":"first-slug","type":"user"}
 {"slug":"second-slug","type":"assistant"}
 {"slug":"first-slug","type":"user"}`;
-    expect(extractSlugsFromJsonl(content)).toEqual(["first-slug", "second-slug"]);
+    expect(extractSlugsFromJsonl(content)).toEqual([
+      "first-slug",
+      "second-slug",
+    ]);
   });
 
   test("returns empty array when no slugs found", () => {
@@ -180,9 +195,12 @@ describe("extractSlugSessionMap", () => {
   }
 
   test("extracts slug and sessionId from single line", () => {
-    const content = '{"slug":"happy-rabbit","sessionId":"05723b08-43ce-4ee1-a0dd-842991cad4bd"}';
+    const content =
+      '{"slug":"happy-rabbit","sessionId":"05723b08-43ce-4ee1-a0dd-842991cad4bd"}';
     const result = extractSlugSessionMap(content);
-    expect(result.get("happy-rabbit")).toBe("05723b08-43ce-4ee1-a0dd-842991cad4bd");
+    expect(result.get("happy-rabbit")).toBe(
+      "05723b08-43ce-4ee1-a0dd-842991cad4bd",
+    );
     expect(result.size).toBe(1);
   });
 
@@ -220,9 +238,12 @@ describe("extractSlugSessionMap", () => {
   });
 
   test("handles UUID sessionIds correctly", () => {
-    const content = '{"slug":"test-plan","sessionId":"a1b2c3d4-e5f6-7890-abcd-ef1234567890"}';
+    const content =
+      '{"slug":"test-plan","sessionId":"a1b2c3d4-e5f6-7890-abcd-ef1234567890"}';
     const result = extractSlugSessionMap(content);
-    expect(result.get("test-plan")).toBe("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    expect(result.get("test-plan")).toBe(
+      "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    );
   });
 
   test("later occurrence overwrites earlier for same slug", () => {
@@ -269,13 +290,18 @@ describe("buildProjectMapping integration", () => {
   function extractProjectName(cwd: string): string {
     if (!cwd) return "";
     const normalized = cwd.replace(/\\/g, "/");
-    const trimmed = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+    const trimmed = normalized.endsWith("/")
+      ? normalized.slice(0, -1)
+      : normalized;
     const lastSlash = trimmed.lastIndexOf("/");
     return lastSlash === -1 ? trimmed : trimmed.slice(lastSlash + 1);
   }
 
   function buildProjectMappingFromData(
-    projectData: Array<{ cwd: string; slugSessions: Array<{ slug: string; sessionId: string }> }>
+    projectData: Array<{
+      cwd: string;
+      slugSessions: Array<{ slug: string; sessionId: string }>;
+    }>,
   ): ProjectMapping {
     const mapping: ProjectMapping = {};
     for (const { cwd, slugSessions } of projectData) {
@@ -293,27 +319,48 @@ describe("buildProjectMapping integration", () => {
         cwd: "/Users/helge/code/plans-viewer",
         slugSessions: [
           { slug: "happy-rabbit", sessionId: "session-123" },
-          { slug: "sad-cat", sessionId: "session-456" }
-        ]
-      }
+          { slug: "sad-cat", sessionId: "session-456" },
+        ],
+      },
     ];
     const mapping = buildProjectMappingFromData(data);
-    expect(mapping["happy-rabbit"]).toEqual({ project: "plans-viewer", sessionId: "session-123" });
-    expect(mapping["sad-cat"]).toEqual({ project: "plans-viewer", sessionId: "session-456" });
+    expect(mapping["happy-rabbit"]).toEqual({
+      project: "plans-viewer",
+      sessionId: "session-123",
+    });
+    expect(mapping["sad-cat"]).toEqual({
+      project: "plans-viewer",
+      sessionId: "session-456",
+    });
   });
 
   test("builds mapping from multiple projects with sessionIds", () => {
     const data = [
-      { cwd: "/Users/helge/code/project-a", slugSessions: [{ slug: "slug-1", sessionId: "sess-a" }] },
-      { cwd: "/Users/helge/code/project-b", slugSessions: [
-        { slug: "slug-2", sessionId: "sess-b1" },
-        { slug: "slug-3", sessionId: "sess-b2" }
-      ]},
+      {
+        cwd: "/Users/helge/code/project-a",
+        slugSessions: [{ slug: "slug-1", sessionId: "sess-a" }],
+      },
+      {
+        cwd: "/Users/helge/code/project-b",
+        slugSessions: [
+          { slug: "slug-2", sessionId: "sess-b1" },
+          { slug: "slug-3", sessionId: "sess-b2" },
+        ],
+      },
     ];
     const mapping = buildProjectMappingFromData(data);
-    expect(mapping["slug-1"]).toEqual({ project: "project-a", sessionId: "sess-a" });
-    expect(mapping["slug-2"]).toEqual({ project: "project-b", sessionId: "sess-b1" });
-    expect(mapping["slug-3"]).toEqual({ project: "project-b", sessionId: "sess-b2" });
+    expect(mapping["slug-1"]).toEqual({
+      project: "project-a",
+      sessionId: "sess-a",
+    });
+    expect(mapping["slug-2"]).toEqual({
+      project: "project-b",
+      sessionId: "sess-b1",
+    });
+    expect(mapping["slug-3"]).toEqual({
+      project: "project-b",
+      sessionId: "sess-b2",
+    });
   });
 
   test("handles empty data", () => {
@@ -322,31 +369,45 @@ describe("buildProjectMapping integration", () => {
   });
 
   test("handles project with no slugs", () => {
-    const data = [
-      { cwd: "/Users/helge/code/no-slugs", slugSessions: [] }
-    ];
+    const data = [{ cwd: "/Users/helge/code/no-slugs", slugSessions: [] }];
     const mapping = buildProjectMappingFromData(data);
     expect(mapping).toEqual({});
   });
 
   test("later project wins for duplicate slugs (with sessionId)", () => {
     const data = [
-      { cwd: "/Users/helge/code/old-project", slugSessions: [{ slug: "duplicate-slug", sessionId: "old-sess" }] },
-      { cwd: "/Users/helge/code/new-project", slugSessions: [{ slug: "duplicate-slug", sessionId: "new-sess" }] },
+      {
+        cwd: "/Users/helge/code/old-project",
+        slugSessions: [{ slug: "duplicate-slug", sessionId: "old-sess" }],
+      },
+      {
+        cwd: "/Users/helge/code/new-project",
+        slugSessions: [{ slug: "duplicate-slug", sessionId: "new-sess" }],
+      },
     ];
     const mapping = buildProjectMappingFromData(data);
-    expect(mapping["duplicate-slug"]).toEqual({ project: "new-project", sessionId: "new-sess" });
+    expect(mapping["duplicate-slug"]).toEqual({
+      project: "new-project",
+      sessionId: "new-sess",
+    });
   });
 
   test("preserves UUID format sessionIds", () => {
     const data = [
       {
         cwd: "/Users/helge/code/test",
-        slugSessions: [{ slug: "test-plan", sessionId: "05723b08-43ce-4ee1-a0dd-842991cad4bd" }]
-      }
+        slugSessions: [
+          {
+            slug: "test-plan",
+            sessionId: "05723b08-43ce-4ee1-a0dd-842991cad4bd",
+          },
+        ],
+      },
     ];
     const mapping = buildProjectMappingFromData(data);
-    expect(mapping["test-plan"].sessionId).toBe("05723b08-43ce-4ee1-a0dd-842991cad4bd");
+    expect(mapping["test-plan"].sessionId).toBe(
+      "05723b08-43ce-4ee1-a0dd-842991cad4bd",
+    );
   });
 });
 
@@ -360,7 +421,9 @@ describe("graceful failure handling", () => {
     function extractProjectName(cwd: string): string {
       if (!cwd) return "";
       const normalized = cwd.replace(/\\/g, "/");
-      const trimmed = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+      const trimmed = normalized.endsWith("/")
+        ? normalized.slice(0, -1)
+        : normalized;
       const lastSlash = trimmed.lastIndexOf("/");
       return lastSlash === -1 ? trimmed : trimmed.slice(lastSlash + 1);
     }
@@ -377,7 +440,9 @@ describe("graceful failure handling", () => {
     });
 
     test("handles mixed separators", () => {
-      expect(extractProjectName("C:\\Users/name\\code/project")).toBe("project");
+      expect(extractProjectName("C:\\Users/name\\code/project")).toBe(
+        "project",
+      );
     });
 
     test("handles very long paths", () => {
@@ -419,7 +484,8 @@ describe("graceful failure handling", () => {
     });
 
     test("handles very large content", () => {
-      const largeContent = "x".repeat(10000) + '{"cwd":"/found/it"}' + "y".repeat(10000);
+      const largeContent =
+        "x".repeat(10000) + '{"cwd":"/found/it"}' + "y".repeat(10000);
       expect(extractCwdFromJsonl(largeContent)).toBe("/found/it");
     });
 
@@ -460,7 +526,7 @@ describe("graceful failure handling", () => {
 
     test("handles very large content with many slugs", () => {
       const slugs = Array.from({ length: 100 }, (_, i) => `slug-${i}`);
-      const content = slugs.map(s => `{"slug":"${s}"}`).join("\n");
+      const content = slugs.map((s) => `{"slug":"${s}"}`).join("\n");
       const result = extractSlugsFromJsonl(content);
       expect(result.length).toBe(100);
     });

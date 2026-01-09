@@ -35,11 +35,11 @@ export function App() {
   // Convert Set to array for API
   const projectsArray = useMemo(
     () => Array.from(selectedProjects),
-    [selectedProjects]
+    [selectedProjects],
   );
 
   // Fetch plans with server-side filtering
-  const { plans, loading, refresh, ensureContent } = usePlans({
+  const { plans, loading, refreshing, refresh, ensureContent } = usePlans({
     q: debouncedSearch,
     sort: sortKey,
     dir: sortDir,
@@ -59,7 +59,7 @@ export function App() {
         setSelectedPlan(null);
       }
     },
-    [ensureContent]
+    [ensureContent],
   );
 
   // Open in editor
@@ -104,7 +104,10 @@ export function App() {
 
   // Clear selection if selected plan is no longer in results
   useEffect(() => {
-    if (selectedPlan && !plans.find((p) => p.filename === selectedPlan.filename)) {
+    if (
+      selectedPlan &&
+      !plans.find((p) => p.filename === selectedPlan.filename)
+    ) {
       setSelectedPlan(null);
     }
   }, [plans, selectedPlan]);
@@ -130,6 +133,7 @@ export function App() {
           onToggleProject={toggleProject}
           onClearProjects={clearProjects}
           onRefresh={refresh}
+          refreshing={refreshing}
         />
 
         {plans.length === 0 ? (

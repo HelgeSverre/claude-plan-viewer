@@ -163,7 +163,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
       port++;
     }
   }
-  throw new Error(`No available port found in range ${startPort}-${startPort + maxAttempts}`);
+  throw new Error(
+    `No available port found in range ${startPort}-${startPort + maxAttempts}`,
+  );
 }
 
 // Cross-platform open file in default editor
@@ -203,7 +205,9 @@ function extractProjectName(cwd: string): string {
   // Normalize: handle both / and \ separators
   const normalized = cwd.replace(/\\/g, "/");
   // Remove trailing slash
-  const trimmed = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+  const trimmed = normalized.endsWith("/")
+    ? normalized.slice(0, -1)
+    : normalized;
   // Get last segment
   const lastSlash = trimmed.lastIndexOf("/");
   return lastSlash === -1 ? trimmed : trimmed.slice(lastSlash + 1);
@@ -342,10 +346,7 @@ async function loadPlans(): Promise<PlanMetadata[]> {
       const filepath = join(PLANS_DIR, filename);
       const file = Bun.file(filepath);
 
-      const [content, stats] = await Promise.all([
-        file.text(),
-        stat(filepath),
-      ]);
+      const [content, stats] = await Promise.all([file.text(), stat(filepath)]);
 
       const titleMatch = content.match(/^#\s+(.+)$/m);
       const title = titleMatch?.[1]
@@ -373,7 +374,7 @@ async function loadPlans(): Promise<PlanMetadata[]> {
         project: metadata?.project || null,
         sessionId: metadata?.sessionId || null,
       };
-    })
+    }),
   );
 
   cachedPlans = plans;
@@ -418,7 +419,9 @@ async function startServer() {
         }
 
         const plans = cachedPlans || [];
-        const projects = [...new Set(plans.map(p => p.project).filter(Boolean))] as string[];
+        const projects = [
+          ...new Set(plans.map((p) => p.project).filter(Boolean)),
+        ] as string[];
         projects.sort((a, b) => a.localeCompare(b));
 
         return Response.json({ projects });
@@ -432,7 +435,7 @@ async function startServer() {
         const plans = cachedPlans || [];
 
         // Strip content from response - will be fetched separately via /api/plans/{id}/content
-        const plansWithoutContent = plans.map(p => ({
+        const plansWithoutContent = plans.map((p) => ({
           filename: p.filename,
           filepath: p.filepath,
           title: p.title,
@@ -466,9 +469,11 @@ async function startServer() {
       },
       "/api/refresh": {
         POST: async () => {
+          const before = cachedPlans?.length ?? 0;
           invalidateCache();
           await loadPlans();
-          return Response.json({ success: true });
+          const after = cachedPlans?.length ?? 0;
+          return Response.json({ success: true, before, after });
         },
       },
       "/api/open": {
@@ -486,10 +491,13 @@ async function startServer() {
         },
       },
     },
-    development: process.env.NODE_ENV !== "production" ? {
-      hmr: true,
-      console: true,
-    } : undefined,
+    development:
+      process.env.NODE_ENV !== "production"
+        ? {
+            hmr: true,
+            console: true,
+          }
+        : undefined,
   });
 
   return server;
@@ -538,7 +546,9 @@ const c = {
     planCount = plans.length;
     sourceDisplay = args.fromFile;
   } else {
-    planCount = (await readdir(PLANS_DIR)).filter(f => f.endsWith('.md')).length;
+    planCount = (await readdir(PLANS_DIR)).filter((f) =>
+      f.endsWith(".md"),
+    ).length;
     sourceDisplay = PLANS_DIR;
     // Only watch for file changes when not using --from-file
     watchPlansDirectory();
@@ -547,15 +557,21 @@ const c = {
   const server = await startServer();
 
   console.log();
-  console.log(`${c.bold}${c.magenta}  📋 Plans Viewer${c.reset}`);
+  console.log(`${c.bold}${c.magenta}  📋 Claude Plan Viewer${c.reset}`);
   console.log(`${c.dim}  ─────────────────────────────${c.reset}`);
   console.log(`${c.green}  ✓${c.reset} Server running`);
   if (!args.fromFile) {
     console.log(`${c.green}  ✓${c.reset} Watching for file changes`);
   }
   console.log();
-  console.log(`${c.dim}  Local:${c.reset}   ${c.cyan}${c.bold}http://localhost:${server.port}${c.reset}`);
-  console.log(`${c.dim}  API:${c.reset}     ${c.cyan}http://localhost:${server.port}/api/${c.reset}`);
-  console.log(`${c.dim}  Plans:${c.reset}   ${c.yellow}${planCount} plans${c.reset} in ${c.dim}${sourceDisplay}${c.reset}`);
+  console.log(
+    `${c.dim}  Local:${c.reset}   ${c.cyan}${c.bold}http://localhost:${server.port}${c.reset}`,
+  );
+  console.log(
+    `${c.dim}  API:${c.reset}     ${c.cyan}http://localhost:${server.port}/api/${c.reset}`,
+  );
+  console.log(
+    `${c.dim}  Plans:${c.reset}   ${c.yellow}${planCount} plans${c.reset} in ${c.dim}${sourceDisplay}${c.reset}`,
+  );
   console.log();
 })();

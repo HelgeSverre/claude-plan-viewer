@@ -13,15 +13,15 @@ interface UsePlansReturn {
   plans: Plan[];
   total: number;
   loading: boolean;
+  refreshing: boolean;
   refresh: () => Promise<void>;
   ensureContent: (plan: Plan) => Promise<Plan>;
 }
 
-export function usePlans(
-  params: UsePlansParams = {},
-): UsePlansReturn {
+export function usePlans(params: UsePlansParams = {}): UsePlansReturn {
   const [allPlans, setAllPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Cache content by filename to persist across filter changes
@@ -64,38 +64,43 @@ export function usePlans(
   }, [loadAllPlans]);
 
   const refresh = useCallback(async () => {
-    contentCache.current.clear();
-    await refreshCache(); // Invalidate backend cache too
-    await loadAllPlans();
+    setRefreshing(true);
+    try {
+      contentCache.current.clear();
+      const { before, after } = await refreshCache();
+      // Only reload if count changed
+      if (before !== after) {
+        await loadAllPlans();
+      }
+    } finally {
+      setRefreshing(false);
+    }
   }, [loadAllPlans]);
 
-  const ensureContent = useCallback(
-    async (plan: Plan): Promise<Plan> => {
-      if (plan.content) return plan;
+  const ensureContent = useCallback(async (plan: Plan): Promise<Plan> => {
+    if (plan.content) return plan;
 
-      // Check cache
-      const cached = contentCache.current.get(plan.filename);
-      if (cached) {
-        const updatedPlan = { ...plan, content: cached };
-        setAllPlans((prev) =>
-          prev.map((p) => (p.filename === plan.filename ? updatedPlan : p))
-        );
-        return updatedPlan;
-      }
-
-      const content = await fetchPlanContent(plan.filename);
-      contentCache.current.set(plan.filename, content);
-      const updatedPlan = { ...plan, content };
-
-      // Update in state
+    // Check cache
+    const cached = contentCache.current.get(plan.filename);
+    if (cached) {
+      const updatedPlan = { ...plan, content: cached };
       setAllPlans((prev) =>
-        prev.map((p) => (p.filename === plan.filename ? updatedPlan : p))
+        prev.map((p) => (p.filename === plan.filename ? updatedPlan : p)),
       );
-
       return updatedPlan;
-    },
-    []
-  );
+    }
+
+    const content = await fetchPlanContent(plan.filename);
+    contentCache.current.set(plan.filename, content);
+    const updatedPlan = { ...plan, content };
+
+    // Update in state
+    setAllPlans((prev) =>
+      prev.map((p) => (p.filename === plan.filename ? updatedPlan : p)),
+    );
+
+    return updatedPlan;
+  }, []);
 
   // Client-side filtering
   const filteredPlans = useMemo(() => {
@@ -103,7 +108,7 @@ export function usePlans(
 
     if (params.q) {
       const lowerQ = params.q.toLowerCase();
-      filtered = filtered.filter(p => {
+      filtered = filtered.filter((p) => {
         const content = contentCache.current.get(p.filename) || "";
         return (
           p.title.toLowerCase().includes(lowerQ) ||
@@ -116,7 +121,9 @@ export function usePlans(
 
     if (params.projects && params.projects.length > 0) {
       const projectFilterSet = new Set(params.projects);
-      filtered = filtered.filter(p => p.project && projectFilterSet.has(p.project));
+      filtered = filtered.filter(
+        (p) => p.project && projectFilterSet.has(p.project),
+      );
     }
 
     return filtered;
@@ -163,6 +170,7 @@ export function usePlans(
     plans: sortedPlans,
     total: sortedPlans.length,
     loading,
+    refreshing,
     refresh,
     ensureContent,
   };

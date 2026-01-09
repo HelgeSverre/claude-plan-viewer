@@ -3,12 +3,12 @@ import type { SortKey, SortDir } from "../types.ts";
 
 // Natural default sort direction per column type
 const SORT_DEFAULTS: Record<SortKey, SortDir> = {
-  title: "asc",      // A → Z
-  project: "asc",    // A → Z
-  size: "desc",      // Biggest first
-  lines: "desc",     // Biggest first
-  modified: "desc",  // Newest first
-  created: "desc",   // Newest first
+  title: "asc", // A → Z
+  project: "asc", // A → Z
+  size: "desc", // Biggest first
+  lines: "desc", // Biggest first
+  modified: "desc", // Newest first
+  created: "desc", // Newest first
 };
 
 interface UseFiltersReturn {
@@ -27,7 +27,7 @@ export function useFilters(): UseFiltersReturn {
   const [sortKey, setSortKey] = useState<SortKey>("modified");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   const setSort = useCallback((key: SortKey, dir?: SortDir) => {

@@ -1,6 +1,8 @@
 import type { Plan, PlanMetadata } from "../types.ts";
 
-export async function fetchPlans(signal?: AbortSignal): Promise<PlanMetadata[]> {
+export async function fetchPlans(
+  signal?: AbortSignal,
+): Promise<PlanMetadata[]> {
   const url = new URL("/api/plans", window.location.origin);
   const res = await fetch(url.toString(), { signal });
   if (!res.ok) {
@@ -33,6 +35,13 @@ export async function openInEditor(filepath: string): Promise<void> {
   });
 }
 
-export async function refreshCache(): Promise<void> {
-  await fetch("/api/refresh", { method: "POST" });
+export interface RefreshResponse {
+  success: boolean;
+  before: number;
+  after: number;
+}
+
+export async function refreshCache(): Promise<RefreshResponse> {
+  const res = await fetch("/api/refresh", { method: "POST" });
+  return res.json();
 }

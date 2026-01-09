@@ -16,6 +16,7 @@ export function App() {
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [showOverlay, setShowOverlay] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Filter state
   const {
@@ -82,6 +83,15 @@ export function App() {
   const handleCopySession = useCallback((sessionId: string) => {
     navigator.clipboard.writeText(`claude --resume ${sessionId}`);
   }, []);
+
+  // Copy plan content
+  const handleCopyPlan = useCallback(() => {
+    if (selectedPlan?.content) {
+      navigator.clipboard.writeText(selectedPlan.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [selectedPlan]);
 
   // Clear search
   const handleClearSearch = useCallback(() => {
@@ -181,6 +191,8 @@ export function App() {
         onOpenEditor={handleOpenEditor}
         onToggleOverlay={() => setShowOverlay(true)}
         onCopySession={handleCopySession}
+        onCopyPlan={handleCopyPlan}
+        copied={copied}
       />
 
       {showOverlay && selectedPlan && (
@@ -189,6 +201,8 @@ export function App() {
           onClose={() => setShowOverlay(false)}
           onOpenEditor={handleOpenEditor}
           onCopySession={handleCopySession}
+          onCopyPlan={handleCopyPlan}
+          copied={copied}
         />
       )}
 

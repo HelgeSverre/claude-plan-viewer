@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import index from "./src/index.html";
 import apiDocs from "./src/api-docs.html";
-import prismBundlePath from "./src/libs/prism.bundle.js" with { type: "file" };
 import pkg from "./package.json";
 import openapi from "./openapi.json";
 

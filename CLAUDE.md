@@ -1,143 +1,63 @@
-Default to using Bun instead of Node.js.
+# CLAUDE.md
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun run test` instead of `jest` or `vitest` (NOT `bun test` directly)
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## APIs
+## Project Overview
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+Claude Plan Viewer is a web-based viewer for Claude Code plan files (`~/.claude/plans/*.md`). It provides a React frontend with a Bun-powered backend that serves plan metadata and content via REST API.
 
-## Testing
+## Commands
 
-Use `bun run test` to run tests (NOT `bun test` directly).
-
-```ts#index.test.ts
-import { test, expect } from "bun:test";
-
-test("hello world", () => {
-  expect(1).toBe(1);
-});
+```bash
+bun install              # Install dependencies
+bun run dev              # Development server with HMR
+bun run test             # Run all tests (NOT `bun test`)
+bun run test:api         # Run API tests only
+bun run test:e2e         # Run Playwright E2E tests
+bun run build            # Build standalone binary for current platform
+bun run build:all        # Build for all platforms
+bun run format           # Format code with Prettier
 ```
 
-## Frontend
+To pass CLI flags in dev mode: `bun run index.ts -- --from-file plans.json`
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+## Architecture
 
-Server:
+**Single-file server** (`index.ts`): Entry point using `Bun.serve()` with HTML imports. Handles:
+- Plan scanning from `~/.claude/plans/` directory
+- Project metadata extraction from `~/.claude/projects/` JSONL files
+- In-memory caching with file watching for live updates
+- REST API endpoints
 
-```ts#index.ts
-import index from "./index.html"
+**React SPA** (`src/client/`): Client-side rendered app bundled automatically by Bun's HTML imports.
+- `App.tsx` - Main component, state management, keyboard shortcuts
+- `hooks/usePlans.ts` - SWR-based data fetching with client-side filtering/sorting
+- `hooks/useFilters.ts` - URL-synced filter state (search, sort, projects)
+- `components/` - UI components (PlansTable, DetailPanel, Markdown, etc.)
 
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
+**Data flow**:
+1. `/api/plans` returns metadata only (no content) for fast initial load
+2. `/api/plans/{filename}/content` fetches content on-demand when plan is selected
+3. Client caches content locally to persist across filter changes
 
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
+## API Endpoints
 
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/plans` | GET | List all plans (metadata only) |
+| `/api/plans/{filename}/content` | GET | Get plan markdown content |
+| `/api/projects` | GET | List unique project names |
+| `/api/refresh` | POST | Force cache refresh |
+| `/api/open` | POST | Open plan in system editor |
+| `/api/openapi.json` | GET | OpenAPI 3.0 specification |
 
-With the following `frontend.tsx`:
+## Key Patterns
 
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+- **Lazy content loading**: Plan content is fetched separately to keep initial load fast
+- **Client-side filtering**: All filtering/sorting happens in browser after initial fetch
+- **Granular cache invalidation**: File watcher only invalidates changed files, project mapping cached separately
+- **URL state sync**: Selected plan and filters persist in URL query params
 
 ## Releasing
 
-This project uses semantic versioning and conventional commits.
-
-### Version Format
-
-- `vMAJOR.MINOR.PATCH` (e.g., v1.2.0)
-- Minor bumps for new features
-- Patch bumps for bug fixes
-- Major bumps for breaking changes
-
-### Commit Convention
-
-- `feat(scope):` - New features (-> Added in changelog)
-- `fix(scope):` - Bug fixes (-> Fixed in changelog)
-- `chore(scope):` - Maintenance tasks
-- `docs(scope):` - Documentation changes
-- `test(scope):` - Test additions/changes
-- `style(scope):` - Code style changes
-- `refactor(scope):` - Code refactoring
-- `build(scope):` - Build system changes
-
-### Release Process
-
-Run `/release` to automate the release (default: minor bump), or `/release patch` for a patch release.
-
-**Manual process:**
-
-1. Run tests: `bun run test`
-2. Verify build: `bun run build`
-3. Commit any unstaged changes (conventional commits)
-4. Update version in `package.json`
-5. Update `CHANGELOG.md` with new version section
-6. Commit: `chore(release): vX.Y.Z - summary`
-7. Tag: `git tag vX.Y.Z`
-8. Push: `git push && git push --tags`
-9. Create GitHub release: `gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."`
+Run `/release` for minor bump or `/release patch` for patch release. Uses conventional commits (`feat:`, `fix:`, `chore:`, etc.).

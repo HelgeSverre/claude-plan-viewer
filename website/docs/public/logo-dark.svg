@@ -1,0 +1,12 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97757"/>
+      <stop offset="100%" stop-color="#e08a70"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="10" fill="url(#logoGradient)"/>
+  <!-- Document icon centered and scaled for 32x32 -->
+  <path d="M10 10.5C10 9.67 10.67 9 11.5 9H16l4 4v8.5c0 .83-.67 1.5-1.5 1.5h-7c-.83 0-1.5-.67-1.5-1.5v-11z" stroke="white" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+  <path d="M16 9v3.5c0 .28.22.5.5.5H20" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

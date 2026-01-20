@@ -1,0 +1,700 @@
+/* ==========================================================================
+   VitePress Theme Overrides - Claude Brand Colors
+   ========================================================================== */
+
+:root {
+  /* Claude brand colors */
+  --claude-bg: #f8f6f0;
+  --claude-bg-card: #ffffff;
+  --claude-text: #2d2a24;
+  --claude-text-secondary: #5c5850;
+  --claude-accent: #d97757;
+  --claude-accent-hover: #c4624a;
+  --claude-accent-light: #f0ebe3;
+  --claude-border: #e0dcd2;
+
+  /* VitePress brand color overrides */
+  --vp-c-brand-1: #d97757;
+  --vp-c-brand-2: #c4624a;
+  --vp-c-brand-3: #b5553d;
+  --vp-c-brand-soft: rgba(217, 119, 87, 0.14);
+
+  /* Text colors */
+  --vp-c-text-1: #2d2a24;
+  --vp-c-text-2: #5c5850;
+  --vp-c-text-3: #7a756a;
+
+  /* Background colors */
+  --vp-c-bg: #f8f6f0;
+  --vp-c-bg-soft: #f0ebe3;
+  --vp-c-bg-mute: #e8e3da;
+  --vp-c-bg-alt: #ffffff;
+
+  /* Border colors */
+  --vp-c-border: #e0dcd2;
+  --vp-c-divider: #e0dcd2;
+  --vp-c-gutter: #e0dcd2;
+
+  /* Sidebar */
+  --vp-sidebar-bg-color: #f8f6f0;
+
+  /* Nav */
+  --vp-nav-bg-color: #f8f6f0;
+
+  /* Code */
+  --vp-code-color: #d97757;
+  --vp-code-bg: #f0ebe3;
+
+  /* Typography - use Georgia for headings */
+  --vp-font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Dark mode overrides */
+.dark {
+  --vp-c-brand-1: #e08a70;
+  --vp-c-brand-2: #d97757;
+  --vp-c-brand-3: #c4624a;
+
+  --vp-c-text-1: #e8e6e1;
+  --vp-c-text-2: #b5b2aa;
+  --vp-c-text-3: #8a867d;
+
+  --vp-c-bg: #1a1918;
+  --vp-c-bg-soft: #252422;
+  --vp-c-bg-mute: #2f2d2a;
+  --vp-c-bg-alt: #1a1918;
+
+  --vp-c-border: #3d3a35;
+  --vp-c-divider: #3d3a35;
+
+  --vp-sidebar-bg-color: #1a1918;
+  --vp-nav-bg-color: #1a1918;
+
+  --vp-code-color: #e08a70;
+  --vp-code-bg: #2f2d2a;
+}
+
+/* Headings use Georgia serif */
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.vp-doc h4,
+.vp-doc h5,
+.vp-doc h6 {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+/* Sidebar title styling */
+.VPSidebar .title {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+/* Nav logo text */
+.VPNavBarTitle .title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Custom Home Page Styles
+   Scoped to .custom-home to avoid conflicts with VitePress default theme
+   ========================================================================== */
+
+.custom-home {
+  /* Reset VitePress wrapper styles */
+  --vp-layout-max-width: 100%;
+}
+
+.custom-home *, .custom-home *::before, .custom-home *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.custom-home {
+  /* Test 2: Improved Contrast - Claude Brand Colors */
+  --bg: #f8f6f0;
+  --bg-card: #ffffff;
+
+  /* Text - darker for better readability */
+  --text: #2d2a24;
+  --text-secondary: #5c5850;
+
+  /* Accent */
+  --accent: #d97757;
+  --accent-hover: #c4624a;
+  --accent-light: #f0ebe3;
+
+  /* Borders */
+  --border: #e0dcd2;
+
+  /* Shadows */
+  --shadow: rgba(45, 42, 36, 0.08);
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .custom-home *, .custom-home *::before, .custom-home *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Subtle paper texture */
+.custom-home::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.02;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.custom-home a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.custom-home a:hover {
+  color: var(--accent-hover);
+}
+
+.custom-home a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.custom-home .container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Header */
+.custom-home header {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.custom-home .header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.custom-home .logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.custom-home .logo-icon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--accent), #e08a70);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-home .logo-icon svg {
+  width: 20px;
+  height: 20px;
+  color: white;
+}
+
+.custom-home .logo-text {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.custom-home nav {
+  display: flex;
+  gap: 32px;
+}
+
+.custom-home nav a {
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+}
+
+.custom-home nav a:hover {
+  color: var(--text);
+}
+
+/* Hero */
+.custom-home .hero {
+  padding: 80px 0 60px;
+  text-align: center;
+}
+
+.custom-home .hero h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin-bottom: 20px;
+  color: var(--text);
+}
+
+.custom-home .hero p {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  max-width: 520px;
+  margin: 0 auto 40px;
+}
+
+/* Install Command */
+.custom-home .install-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 32px;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.custom-home .install-card code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.custom-home .copy-btn {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.custom-home .copy-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.custom-home .copy-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.custom-home .copy-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.custom-home .copy-btn.copied {
+  background: #2E7D32;
+}
+
+/* CTA buttons */
+.custom-home .cta-group {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.custom-home .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.custom-home .btn-primary {
+  background: var(--text);
+  color: #fff;
+}
+
+.custom-home .btn-primary:hover {
+  background: #333;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.custom-home .btn-secondary {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.custom-home .btn-secondary:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-light);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.custom-home .btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.custom-home .btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Screenshot */
+.custom-home .screenshot-section {
+  padding: 40px 0 80px;
+}
+
+.custom-home .screenshot-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px var(--shadow);
+}
+
+.custom-home .screenshot-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.custom-home .screenshot-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.custom-home .screenshot-dot:nth-child(1) { background: #ff5f57; }
+.custom-home .screenshot-dot:nth-child(2) { background: #febc2e; }
+.custom-home .screenshot-dot:nth-child(3) { background: #28c840; }
+
+.custom-home .screenshot-img {
+  width: 100%;
+  display: block;
+}
+
+.custom-home .screenshot-placeholder {
+  aspect-ratio: 16/9;
+  background: linear-gradient(135deg, #FAFAF8 0%, var(--bg) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+/* Features */
+.custom-home .features {
+  padding: 80px 0;
+}
+
+.custom-home .features h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2rem;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.custom-home .feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.custom-home .feature-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.custom-home .feature-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.custom-home .feature-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--accent-light);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  color: var(--accent);
+}
+
+.custom-home .feature-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.custom-home .feature-card h3 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.custom-home .feature-card p {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.custom-home .kbd {
+  display: inline-block;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* Code blocks */
+.custom-home pre, .custom-home .code-block {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.875rem;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* Inline code */
+.custom-home code:not(pre code) {
+  background: var(--accent-light);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+/* Installation */
+.custom-home .installation {
+  padding: 80px 0;
+  background: var(--bg-card);
+  margin: 0 -24px;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.custom-home .installation h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2rem;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+/* Tabs interface */
+.custom-home .install-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+
+.custom-home .install-tab {
+  padding: 10px 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.custom-home .install-tab:hover:not(.active) {
+  color: var(--text);
+  background: var(--accent-light);
+}
+
+.custom-home .install-tab.active {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+}
+
+.custom-home .install-panel {
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.custom-home .install-command {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 16px 24px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.custom-home .install-command code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.custom-home .install-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.custom-home .install-download-link {
+  display: inline-block;
+  background: var(--accent);
+  color: white;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  transition: all 0.2s;
+}
+
+.custom-home .install-download-link:hover {
+  background: var(--accent-hover);
+  color: white;
+  transform: translateY(-1px);
+}
+
+/* Footer */
+.custom-home footer {
+  padding: 40px 0;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.custom-home .footer-links {
+  display: flex;
+  gap: 32px;
+  justify-content: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.custom-home .footer-links a {
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+}
+
+.custom-home .footer-links a.npm-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.custom-home .footer-links a.npm-link svg {
+  width: 32px;
+  height: auto;
+  fill: currentColor;
+  transition: fill 0.2s ease;
+}
+
+.custom-home .footer-links a.npm-link:hover svg {
+  fill: #C12127;
+}
+
+.custom-home .footer-credit {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.custom-home .disclaimer {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  max-width: 500px;
+  margin: 0 auto;
+  opacity: 0.8;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .custom-home .hero {
+    padding: 60px 0 40px;
+  }
+
+  .custom-home .hero h1 {
+    font-size: 2rem;
+  }
+
+  .custom-home .hero p {
+    font-size: 1rem;
+  }
+
+  .custom-home nav {
+    display: none;
+  }
+
+  .custom-home .install-card {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .custom-home .feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .custom-home .features, .custom-home .installation {
+    padding: 60px 0;
+  }
+}

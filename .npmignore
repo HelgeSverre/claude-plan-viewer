@@ -1,0 +1,28 @@
+# Marketing website (deployed separately via Vercel)
+website/
+
+# Work in progress / prototypes
+wip/
+
+# Documentation (deployed separately via Mintlify)
+docs/
+
+# Development/test files
+test/
+e2e/
+*.test.ts
+playwright.config.ts
+test-results/
+playwright-report/
+
+# Build artifacts
+out/
+*.tgz
+
+# IDE/Editor
+.idea/
+.vscode/
+
+# Misc
+.DS_Store
+*.log

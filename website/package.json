@@ -1,0 +1,18 @@
+{
+  "name": "claude-plan-viewer-website",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "cd docs && vitepress dev",
+    "build": "cd docs && vitepress build",
+    "preview": "cd docs && vitepress preview",
+    "test": "bunx playwright test",
+    "test:install": "bunx playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "vitepress": "^1.6.3",
+    "vue": "^3.5.13"
+  }
+}

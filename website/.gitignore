@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+docs/node_modules/
+
+# Build outputs
+dist/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
+# Test outputs
+test-results/
+playwright-report/
+
+# Misc
+.DS_Store
+*.log

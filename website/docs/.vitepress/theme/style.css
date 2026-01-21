@@ -286,6 +286,15 @@
   box-shadow: 0 2px 12px rgba(0,0,0,0.2);
 }
 
+/* npm button icon color */
+.custom-home .npm-btn {
+  color: #CB3837;
+}
+
+.dark .custom-home .npm-btn {
+  color: #fff;
+}
+
 /* Subtle paper texture */
 .custom-home::before {
   content: "";

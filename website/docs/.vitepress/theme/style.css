@@ -66,12 +66,30 @@
 
   --vp-c-border: #3d3a35;
   --vp-c-divider: #3d3a35;
+  --vp-c-gutter: #3d3a35;
 
   --vp-sidebar-bg-color: #1a1918;
   --vp-nav-bg-color: #1a1918;
 
   --vp-code-color: #e08a70;
   --vp-code-bg: #2f2d2a;
+}
+
+/* Custom block code contrast fixes */
+.custom-block.tip code {
+  color: #8b4332;  /* Darker rust - 4.7:1 contrast on tip bg */
+}
+
+.custom-block.info code {
+  color: #2563eb;  /* Darker blue - good contrast on info bg */
+}
+
+.dark .custom-block.tip code {
+  color: #f5c4b8;  /* Light peachy - 5.2:1 contrast on dark tip bg */
+}
+
+.dark .custom-block.info code {
+  color: #93c5fd;  /* Light blue - good contrast on dark info bg */
 }
 
 /* Headings use Georgia serif */
@@ -136,6 +154,13 @@
   color: var(--text);
   line-height: 1.6;
   min-height: 100vh;
+  scroll-behavior: smooth;
+}
+
+/* Scroll offset for sticky header */
+.custom-home .features,
+.custom-home .installation {
+  scroll-margin-top: 80px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -144,6 +169,45 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Dark mode support for custom home */
+.dark .custom-home {
+  --bg: #1a1918;
+  --bg-card: #252422;
+  --text: #e8e6e1;
+  --text-secondary: #b5b2aa;
+  --accent: #e08a70;
+  --accent-hover: #d97757;
+  --accent-light: #2f2d2a;
+  --border: #3d3a35;
+  --shadow: rgba(0, 0, 0, 0.3);
+}
+
+.dark .custom-home .btn-primary {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.dark .custom-home .btn-primary:hover {
+  background: #fff;
+  color: #1a1918;
+}
+
+.dark .custom-home .screenshot-dot:nth-child(1) { background: #ff5f57; }
+.dark .custom-home .screenshot-dot:nth-child(2) { background: #febc2e; }
+.dark .custom-home .screenshot-dot:nth-child(3) { background: #28c840; }
+
+.dark .custom-home .copy-btn.copied {
+  background: #388E3C;
+}
+
+.dark .custom-home .install-tab.active {
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.2);
+}
+
+.dark .custom-home .install-panel {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
 }
 
 /* Subtle paper texture */
@@ -281,6 +345,8 @@
 }
 
 .custom-home .install-card code {
+  background: none;
+  padding: 0;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 1rem;
   color: var(--text);
@@ -373,6 +439,15 @@
 .custom-home .btn svg {
   width: 18px;
   height: 18px;
+}
+
+.custom-home .btn-icon {
+  padding: 14px;
+}
+
+.custom-home .btn-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 /* Screenshot */
@@ -579,7 +654,7 @@
 .custom-home .install-command {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 16px;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -589,6 +664,8 @@
 }
 
 .custom-home .install-command code {
+  background: none;
+  padding: 0;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 15px;
   color: var(--text);
@@ -637,22 +714,6 @@
   font-size: 0.9375rem;
 }
 
-.custom-home .footer-links a.npm-link {
-  display: inline-flex;
-  align-items: center;
-}
-
-.custom-home .footer-links a.npm-link svg {
-  width: 32px;
-  height: auto;
-  fill: currentColor;
-  transition: fill 0.2s ease;
-}
-
-.custom-home .footer-links a.npm-link:hover svg {
-  fill: #C12127;
-}
-
 .custom-home .footer-credit {
   font-size: 0.8125rem;
   color: var(--text-secondary);
@@ -667,8 +728,78 @@
   opacity: 0.8;
 }
 
+/* Mobile menu button */
+.custom-home .mobile-menu-btn {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  z-index: 101;
+}
+
+.custom-home .mobile-menu-btn span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.custom-home .mobile-menu-btn.open span:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+
+.custom-home .mobile-menu-btn.open span:nth-child(2) {
+  opacity: 0;
+}
+
+.custom-home .mobile-menu-btn.open span:nth-child(3) {
+  transform: rotate(-45deg) translate(5px, -5px);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
+  .custom-home .mobile-menu-btn {
+    display: flex;
+  }
+
+  .custom-home nav {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+  }
+
+  .custom-home nav.open {
+    max-height: 300px;
+    padding: 16px 0;
+  }
+
+  .custom-home nav a {
+    display: block;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .custom-home nav a:last-child {
+    border-bottom: none;
+  }
+
   .custom-home .hero {
     padding: 60px 0 40px;
   }
@@ -679,10 +810,6 @@
 
   .custom-home .hero p {
     font-size: 1rem;
-  }
-
-  .custom-home nav {
-    display: none;
   }
 
   .custom-home .install-card {

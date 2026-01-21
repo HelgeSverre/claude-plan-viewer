@@ -3,6 +3,7 @@ import { ref } from "vue";
 
 const copiedStates = ref<Record<string, boolean>>({});
 const activeTab = ref<string>("npx");
+const mobileMenuOpen = ref(false);
 
 const installMethods = [
     { id: "npx", label: "npx", command: "npx claude-plan-viewer", hint: "No installation required. Runs directly with Node.js 18+" },
@@ -46,14 +47,25 @@ async function copyToClipboard(text: string, key: string) {
                     </div>
                     <span class="logo-text">Claude Plan Viewer</span>
                 </a>
-                <nav>
-                    <a href="#features">Features</a>
-                    <a href="#installation">Installation</a>
-                    <a href="/getting-started/quickstart">Docs</a>
+                <button
+                    class="mobile-menu-btn"
+                    :class="{ open: mobileMenuOpen }"
+                    @click="mobileMenuOpen = !mobileMenuOpen"
+                    aria-label="Toggle menu"
+                >
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <nav :class="{ open: mobileMenuOpen }">
+                    <a href="#features" @click="mobileMenuOpen = false">Features</a>
+                    <a href="#installation" @click="mobileMenuOpen = false">Installation</a>
+                    <a href="/getting-started/quickstart" @click="mobileMenuOpen = false">Docs</a>
                     <a
                         href="https://github.com/HelgeSverre/claude-plan-viewer"
                         target="_blank"
                         rel="noopener"
+                        @click="mobileMenuOpen = false"
                         >GitHub</a
                     >
                 </nav>
@@ -135,20 +147,20 @@ async function copyToClipboard(text: string, key: string) {
                         </a>
                         <a
                             href="https://npmjs.com/package/claude-plan-viewer"
-                            class="btn btn-secondary"
+                            class="btn btn-secondary btn-icon"
                             target="_blank"
                             rel="noopener"
+                            aria-label="npm package"
                         >
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                fill="currentColor"
-                                viewBox="0 0 24 24"
+                                viewBox="0 0 576 512"
+                                fill="#CB3837"
                             >
                                 <path
-                                    d="M0 7.334v8h6.666v1.332H12v-1.332h12v-8H0zm6.666 6.664H5.334v-4H3.999v4H1.335V8.667h5.331v5.331zm4 0v1.336H8.001V8.667h5.334v5.332h-2.669v-.001zm12.001 0h-1.33v-4h-1.336v4h-1.335v-4h-1.33v4h-2.671V8.667h8.002v5.331z"
+                                    d="M288 288h-32v-64h32v64zm288-128v192H288v32H160v-32H0V160h576zm-416 32H32v128h64v-96h32v96h32V192zm160 0H192v160h64v-32h64V192zm224 0H352v128h64v-96h32v96h32v-96h32v96h32V192z"
                                 />
                             </svg>
-                            npm Package
                         </a>
                     </div>
                 </div>
@@ -373,19 +385,8 @@ async function copyToClipboard(text: string, key: string) {
                         href="https://npmjs.com/package/claude-plan-viewer"
                         target="_blank"
                         rel="noopener"
-                        class="npm-link"
-                        aria-label="npm package"
+                        >npm</a
                     >
-                        <svg
-                            viewBox="0 0 780 250"
-                            xmlns="http://www.w3.org/2000/svg"
-                            aria-hidden="true"
-                        >
-                            <path
-                                d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"
-                            />
-                        </svg>
-                    </a>
                     <a
                         href="https://github.com/HelgeSverre/claude-plan-viewer/releases"
                         target="_blank"

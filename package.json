@@ -29,7 +29,10 @@
     "install:local": "bun scripts/install-local.ts",
     "uninstall:link": "bun unlink",
     "uninstall:local": "bun scripts/uninstall-local.ts",
-    "format": "bunx prettier --write src"
+    "format": "bunx prettier --write src",
+    "website:dev": "cd website/docs && bun run dev",
+    "website:build": "cd website/docs && bun run build",
+    "website:preview": "cd website/docs && bun run preview"
   },
   "keywords": [
     "claude",

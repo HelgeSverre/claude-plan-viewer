@@ -22,6 +22,13 @@ When run without arguments, Claude Plan Viewer starts a web server on port 3000 
 
 Port to start the server on. If the specified port is in use, the server automatically finds the next available port.
 
+### `--host`, `-H`
+
+**Type:** `string`
+**Default:** `localhost`
+
+Host address to bind the server to. Use `0.0.0.0` to listen on all network interfaces, making the server accessible from other devices on the network.
+
 ### `--claude-dir`, `-c`
 
 **Type:** `string`
@@ -87,6 +94,30 @@ claude-plan-viewer --port 8080
 claude-plan-viewer -p 8080
 ```
 
+:::
+
+### Listen on All Interfaces
+
+Make the server accessible from other devices on the network:
+
+::: code-group
+
+```bash [Long form]
+claude-plan-viewer --host 0.0.0.0
+```
+
+```bash [Short form]
+claude-plan-viewer -H 0.0.0.0
+```
+
+```bash [Combined with port]
+claude-plan-viewer --host 0.0.0.0 --port 8080
+```
+
+:::
+
+::: warning
+Binding to `0.0.0.0` exposes the server to your local network. Only use this on trusted networks.
 :::
 
 ### Custom Claude Directory
@@ -235,6 +266,7 @@ claude-plan-viewer
 | Flag | Short | Argument | Description |
 |------|-------|----------|-------------|
 | `--port` | `-p` | `<number>` | Server port (default: 3000) |
+| `--host` | `-H` | `<address>` | Host to bind to (default: localhost) |
 | `--claude-dir` | `-c` | `<path>` | Claude directory path |
 | `--json` | `-j` | - | Export plans as JSON |
 | `--output` | `-o` | `<file>` | Output file for export |

@@ -66,6 +66,10 @@ claude-plan-viewer
 # Start on specific port
 claude-plan-viewer --port 8080
 claude-plan-viewer -p 8080
+
+# Listen on all network interfaces (accessible from other devices)
+claude-plan-viewer --host 0.0.0.0
+claude-plan-viewer -H 0.0.0.0
 ```
 
 The server will automatically find an available port if the requested port is in use.
@@ -75,6 +79,7 @@ The server will automatically find an available port if the requested port is in
 | Flag                  | Short | Description                                               |
 | --------------------- | ----- | --------------------------------------------------------- |
 | `--port <number>`     | `-p`  | Port to start the server on (default: 3000)               |
+| `--host <address>`    | `-H`  | Host to bind to (default: localhost)                      |
 | `--claude-dir <path>` | `-c`  | Path to `.claude` directory (default: `~/.claude`)        |
 | `--json`              | `-j`  | Export all plans as JSON and exit                         |
 | `--output <file>`     | `-o`  | Output file for JSON export (prints to stdout if omitted) |

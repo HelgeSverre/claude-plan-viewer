@@ -9,7 +9,7 @@ Claude Plan Viewer exposes a REST API for programmatic access to your Claude Cod
 
 ::: tip OpenAPI Specification
 The full OpenAPI 3.0 specification is available:
-- **Interactive**: [API Playground](/integrations/api-playground) - try out endpoints directly
+- **Interactive**: [API Playground](/reference/api-playground) - try out endpoints directly
 - **Download**: [openapi.json](/openapi.json) (for import into API tools, available on docs site)
 - **Live**: `/api/openapi.json` when the server is running
 :::

@@ -162,4 +162,4 @@ You should see the version number printed to the console.
 ## Next Steps
 
 - [Quick Start](/introduction/quickstart) - Get up and running in under a minute
-- [CLI Reference](/integrations/cli) - Explore all command-line options
+- [CLI Reference](/reference/cli) - Explore all command-line options

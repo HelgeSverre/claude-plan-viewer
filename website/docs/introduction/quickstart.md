@@ -78,6 +78,6 @@ On Windows and Linux, use `Ctrl` instead of `Cmd`.
 ## Next Steps
 
 - [Installation Options](/introduction/installation) - Install globally or download standalone binaries
-- [CLI Reference](/integrations/cli) - Explore all command-line options
+- [CLI Reference](/reference/cli) - Explore all command-line options
 - [JSON Export](/guides/json-export) - Export your plans for backup or processing
-- [API Reference](/integrations/api) - Integrate with the REST API
+- [API Reference](/reference/api) - Integrate with the REST API

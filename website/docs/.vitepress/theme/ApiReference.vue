@@ -5,67 +5,79 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useData } from 'vitepress'
 
 const { isDark } = useData()
+
+const scalarConfig = {
+  spec: {
+    url: '/openapi.json'
+  },
+  // Theme & Layout
+  theme: 'saturn',
+  layout: 'modern',
+  withDefaultFonts: true,
+
+  // Metadata
+  title: 'Claude Plan Viewer API',
+
+  // Sidebar & Navigation
+  showSidebar: true,
+  defaultOpenAllTags: false,
+
+  // UI Elements
+  hideDownloadButton: false,
+  hideDarkModeToggle: true,
+  hideClientButton: true,
+  hideSearch: true,
+  hideTestRequestButton: true,
+  hideModels: false,
+
+  // Operation Display
+  operationTitleSource: 'summary',
+  showOperationId: false,
+  expandAllModelSections: true,
+  expandAllResponses: false,
+
+  // Schema Display
+  orderSchemaPropertiesBy: 'alpha',
+  orderRequiredPropertiesFirst: true,
+
+  // Developer Tools
+  showDeveloperTools: 'never',
+  showToolbar: 'never',
+
+  // Download & Export
+  documentDownloadType: 'both',
+
+  // Privacy & Other
+  telemetry: false,
+  persistAuth: false,
+  isEditable: false,
+  searchHotKey: 'k',
+}
+
+function createApiReference() {
+  const container = document.getElementById('scalar-api-reference')
+  if (!container || !window.Scalar) return
+  container.innerHTML = ''
+  window.Scalar.createApiReference('#scalar-api-reference', {
+    ...scalarConfig,
+    darkMode: isDark.value,
+  })
+}
 
 onMounted(() => {
   // Dynamically load Scalar
   const script = document.createElement('script')
   script.src = 'https://cdn.jsdelivr.net/npm/@scalar/api-reference'
-  script.onload = () => {
-    window.Scalar.createApiReference('#scalar-api-reference', {
-      spec: {
-        url: '/openapi.json'
-      },
-      // Theme & Layout
-      theme: 'saturn',
-      layout: 'modern',
-      darkMode: isDark.value,
-      withDefaultFonts: true,
-
-      // Metadata
-      title: 'Claude Plan Viewer API',
-
-      // Sidebar & Navigation
-      showSidebar: true,
-      defaultOpenAllTags: false,
-
-      // UI Elements
-      hideDownloadButton: false,
-      hideDarkModeToggle: true,
-      hideClientButton: true,
-      hideSearch: true,
-      hideTestRequestButton: true,
-      hideModels: false,
-
-      // Operation Display
-      operationTitleSource: 'summary',
-      showOperationId: false,
-      expandAllModelSections: true,
-      expandAllResponses: false,
-
-      // Schema Display
-      orderSchemaPropertiesBy: 'alpha',
-      orderRequiredPropertiesFirst: true,
-
-      // Developer Tools
-      showDeveloperTools: 'never',
-      showToolbar: 'never',
-
-      // Download & Export
-      documentDownloadType: 'both',
-
-      // Privacy & Other
-      telemetry: false,
-      persistAuth: false,
-      isEditable: false,
-      searchHotKey: 'k',
-    })
-  }
+  script.onload = createApiReference
   document.head.appendChild(script)
 })
+
+// Watch for theme changes and recreate the API reference
+watch(isDark, createApiReference)
 </script>
 
 <style scoped>

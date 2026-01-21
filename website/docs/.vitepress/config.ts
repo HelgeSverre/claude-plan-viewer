@@ -38,7 +38,8 @@ export default defineConfig({
         text: 'Reference',
         items: [
           { text: 'CLI Options', link: '/reference/cli' },
-          { text: 'REST API', link: '/reference/api' }
+          { text: 'REST API', link: '/reference/api' },
+          { text: 'API Playground', link: '/reference/api-playground' }
         ]
       },
       {
@@ -59,7 +60,8 @@ export default defineConfig({
     ],
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/HelgeSverre/claude-plan-viewer' }
+      { icon: 'github', link: 'https://github.com/HelgeSverre/claude-plan-viewer' },
+      { icon: 'npm', link: 'https://www.npmjs.com/package/claude-plan-viewer' }
     ],
 
     search: {

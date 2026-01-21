@@ -17,8 +17,8 @@ Claude Plan Viewer is an open-source tool that provides a React frontend with a 
 
 ## Documentation
 
-- [Quick Start](/getting-started/quickstart): Get started in under a minute
-- [Installation](/getting-started/installation): All installation methods
+- [Quick Start](/introduction/quickstart): Get started in under a minute
+- [Installation](/introduction/installation): All installation methods
 - [CLI Reference](/reference/cli): Command-line options and flags
 - [REST API](/reference/api): API endpoints documentation
 - [API Playground](/reference/api-playground): Interactive API explorer

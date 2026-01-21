@@ -92,6 +92,38 @@
   color: #93c5fd;  /* Light blue - good contrast on dark info bg */
 }
 
+/* API Playground page - full width, no sidebar */
+.api-playground-page .VPSidebar {
+  display: none !important;
+}
+
+.api-playground-page .VPContent {
+  padding-left: 0 !important;
+}
+
+.api-playground-page .VPDoc {
+  padding: 0 !important;
+}
+
+.api-playground-page .VPDoc .container {
+  max-width: 100% !important;
+}
+
+.api-playground-page .VPDoc .content {
+  max-width: 100% !important;
+  padding: 0 !important;
+}
+
+.api-playground-page .VPDoc .content-container {
+  max-width: 100% !important;
+}
+
+@media (min-width: 960px) {
+  .api-playground-page .VPContent.has-sidebar {
+    padding-left: 0 !important;
+  }
+}
+
 /* Headings use Georgia serif */
 .vp-doc h1,
 .vp-doc h2,

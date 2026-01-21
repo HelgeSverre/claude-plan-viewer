@@ -339,11 +339,8 @@ let cachedPlans: PlanMetadata[] | null = null;
 let cachedProjectMapping: ProjectMapping | null = null;
 const contentCache = new Map<string, string>();
 
-async function loadPlans(
-  onProgress?: (stage: string, current?: number, total?: number) => void
-): Promise<PlanMetadata[]> {
+async function loadPlans(): Promise<PlanMetadata[]> {
   // Build or use cached project mapping
-  onProgress?.("Scanning projects...");
   let projectMapping: ProjectMapping;
   if (!cachedProjectMapping) {
     projectMapping = await buildProjectMapping();
@@ -354,12 +351,6 @@ async function loadPlans(
 
   const files = await readdir(PLANS_DIR);
   const mdFiles = files.filter((f) => f.endsWith(".md"));
-  const total = mdFiles.length;
-
-  onProgress?.("Loading plans...", 0, total);
-
-  // Track progress as each file completes
-  let completed = 0;
 
   const plans = await Promise.all(
     mdFiles.map(async (filename) => {
@@ -376,18 +367,12 @@ async function loadPlans(
         ? titleMatch[1].replace(/^Plan:\s*/i, "")
         : filename.replace(".md", "");
 
-      // Look up project from metadata using plan slug (filename without .md)
       const slug = filename.replace(".md", "");
       const lineCount = content.split("\n").length;
       const wordCount = content.split(/\s+/).filter(Boolean).length;
 
       const metadata = projectMapping[slug];
-      // Cache content separately for search and lazy loading
       contentCache.set(filename, content);
-
-      // Report progress as each file completes
-      completed++;
-      onProgress?.("Loading plans...", completed, total);
 
       return {
         filename,
@@ -557,39 +542,6 @@ function link(url: string, text?: string): string {
   return `\x1b]8;;${url}\x07${text ?? url}\x1b]8;;\x07`;
 }
 
-// Progress indicator for loading with real-time updates
-function createProgress() {
-  const barWidth = 30;
-  let lastUpdate = 0;
-  const throttleMs = 16; // ~60fps max update rate
-
-  return {
-    update: (label: string, current?: number, total?: number) => {
-      const now = Date.now();
-
-      if (current !== undefined && total !== undefined && total > 0) {
-        // Throttle updates but always show first and last
-        const isFirst = current === 0;
-        const isLast = current === total;
-        const shouldUpdate = isFirst || isLast || now - lastUpdate >= throttleMs;
-
-        if (shouldUpdate) {
-          lastUpdate = now;
-          const percent = current / total;
-          const filled = Math.round(barWidth * percent);
-          const empty = barWidth - filled;
-          const bar = "█".repeat(filled) + "░".repeat(empty);
-          process.stdout.write(`\r  ${label} [${bar}] ${current}/${total}`);
-        }
-      } else {
-        process.stdout.write(`\r  ⏳ ${label}`);
-      }
-    },
-    stop: () => {
-      process.stdout.write("\n");
-    },
-  };
-}
 
 // Main entry point
 (async () => {
@@ -631,26 +583,13 @@ function createProgress() {
     // Only watch for file changes when not using --from-file
     watchPlansDirectory();
 
-    // Load plans with progress bar
-    const progress = createProgress();
-
-    try {
-      await loadPlans((stage, current, total) => {
-        progress.update(stage, current, total);
-      });
-    } catch (err) {
-      progress.stop();
-      console.error("Error loading plans:", err);
-      throw err;
-    }
+    await loadPlans();
 
     const projects = new Set(
       (cachedPlans || []).map((p) => p.project).filter(Boolean)
     );
     projectCount = projects.size;
     planCount = cachedPlans?.length ?? 0;
-
-    progress.stop();
   }
 
   const localUrl = `http://localhost:${server.port}/`;

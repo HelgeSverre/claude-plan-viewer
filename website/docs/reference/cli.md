@@ -1,9 +1,9 @@
 ---
-title: CLI Reference
-description: Complete reference for all Claude Plan Viewer command-line options
+title: CLI
+description: Command-line options for Claude Plan Viewer
 ---
 
-# CLI Reference
+# CLI
 
 ## Usage
 
@@ -11,7 +11,7 @@ description: Complete reference for all Claude Plan Viewer command-line options
 claude-plan-viewer [options]
 ```
 
-When run without arguments, Claude Plan Viewer starts a web server on port 3000 and opens the browser interface for browsing plans from `~/.claude/plans`.
+When run without arguments, Claude Plan Viewer starts a web server on port 3000 and prints the URL for browsing plans from `~/.claude/plans`.
 
 ## Options
 

@@ -9,8 +9,8 @@ Claude Plan Viewer exposes a REST API for programmatic access to your Claude Cod
 
 ::: tip OpenAPI Specification
 The full OpenAPI 3.0 specification is available:
-- **Interactive**: [API Playground](/reference/api-playground) - try out endpoints directly
-- **Static**: [openapi.json](/openapi.json) (for import into API tools)
+- **Interactive**: [API Playground](/integrations/api-playground) - try out endpoints directly
+- **Download**: [openapi.json](/openapi.json) (for import into API tools, available on docs site)
 - **Live**: `/api/openapi.json` when the server is running
 :::
 
@@ -185,9 +185,17 @@ curl -X POST http://localhost:3000/api/refresh
 
 ```json
 {
-  "success": true
+  "success": true,
+  "before": 10,
+  "after": 12
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | `boolean` | Whether the cache was refreshed successfully |
+| `before` | `integer` | Number of plans before refresh |
+| `after` | `integer` | Number of plans after refresh |
 
 ### Use Cases
 
@@ -280,14 +288,13 @@ All endpoints return standard HTTP status codes:
 | 404 | Resource not found |
 | 500 | Internal server error |
 
-Error responses include a JSON body with details when applicable:
+Error responses return plain text messages:
 
-```json
-{
-  "error": "Plan not found",
-  "filename": "nonexistent.md"
-}
-```
+| Endpoint | Status | Message |
+|----------|--------|---------|
+| `/api/plans/{filename}/content` | 404 | `Plan not found` |
+| `/api/open` | 400 | `Invalid path` |
+| `/api/open` | 500 | `Failed to open file` |
 
 ---
 

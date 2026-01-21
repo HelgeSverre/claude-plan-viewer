@@ -2,6 +2,17 @@
    VitePress Theme Overrides - Claude Brand Colors
    ========================================================================== */
 
+/* Smooth scrolling for anchor links */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 :root {
   /* Claude brand colors */
   --claude-bg: #f8f6f0;

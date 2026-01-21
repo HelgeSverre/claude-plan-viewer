@@ -358,53 +358,51 @@ async function loadPlans(
 
   onProgress?.("Loading plans...", 0, total);
 
-  // Process in batches to show progress (batch size balances speed vs visibility)
-  const batchSize = 50;
-  const plans: PlanMetadata[] = [];
+  // Track progress as each file completes
+  let completed = 0;
 
-  for (let i = 0; i < mdFiles.length; i += batchSize) {
-    const batch = mdFiles.slice(i, i + batchSize);
-    const batchPlans = await Promise.all(
-      batch.map(async (filename) => {
-        const filepath = join(PLANS_DIR, filename);
-        const file = Bun.file(filepath);
+  const plans = await Promise.all(
+    mdFiles.map(async (filename) => {
+      const filepath = join(PLANS_DIR, filename);
+      const file = Bun.file(filepath);
 
-        const [content, stats] = await Promise.all([
-          file.text(),
-          stat(filepath),
-        ]);
+      const [content, stats] = await Promise.all([
+        file.text(),
+        stat(filepath),
+      ]);
 
-        const titleMatch = content.match(/^#\s+(.+)$/m);
-        const title = titleMatch?.[1]
-          ? titleMatch[1].replace(/^Plan:\s*/i, "")
-          : filename.replace(".md", "");
+      const titleMatch = content.match(/^#\s+(.+)$/m);
+      const title = titleMatch?.[1]
+        ? titleMatch[1].replace(/^Plan:\s*/i, "")
+        : filename.replace(".md", "");
 
-        // Look up project from metadata using plan slug (filename without .md)
-        const slug = filename.replace(".md", "");
-        const lineCount = content.split("\n").length;
-        const wordCount = content.split(/\s+/).filter(Boolean).length;
+      // Look up project from metadata using plan slug (filename without .md)
+      const slug = filename.replace(".md", "");
+      const lineCount = content.split("\n").length;
+      const wordCount = content.split(/\s+/).filter(Boolean).length;
 
-        const metadata = projectMapping[slug];
-        // Cache content separately for search and lazy loading
-        contentCache.set(filename, content);
+      const metadata = projectMapping[slug];
+      // Cache content separately for search and lazy loading
+      contentCache.set(filename, content);
 
-        return {
-          filename,
-          filepath,
-          title,
-          size: stats.size,
-          modified: stats.mtime.toISOString(),
-          created: stats.birthtime.toISOString(),
-          lineCount,
-          wordCount,
-          project: metadata?.project || null,
-          sessionId: metadata?.sessionId || null,
-        };
-      }),
-    );
-    plans.push(...batchPlans);
-    onProgress?.("Loading plans...", plans.length, total);
-  }
+      // Report progress as each file completes
+      completed++;
+      onProgress?.("Loading plans...", completed, total);
+
+      return {
+        filename,
+        filepath,
+        title,
+        size: stats.size,
+        modified: stats.mtime.toISOString(),
+        created: stats.birthtime.toISOString(),
+        lineCount,
+        wordCount,
+        project: metadata?.project || null,
+        sessionId: metadata?.sessionId || null,
+      };
+    }),
+  );
 
   cachedPlans = plans;
   return plans;
@@ -559,29 +557,36 @@ function link(url: string, text?: string): string {
   return `\x1b]8;;${url}\x07${text ?? url}\x1b]8;;\x07`;
 }
 
-// Progress bar for loading indication
+// Progress indicator for loading with real-time updates
 function createProgress() {
-  const barWidth = 20;
-
-  const write = (label: string, current: number, total: number) => {
-    const percent = total > 0 ? current / total : 0;
-    const filled = Math.round(barWidth * percent);
-    const empty = barWidth - filled;
-    const bar = "█".repeat(filled) + "░".repeat(empty);
-    process.stdout.write(`\r\x1b[K  ${label} [${bar}] ${current}/${total}`);
-  };
+  const barWidth = 30;
+  let lastUpdate = 0;
+  const throttleMs = 16; // ~60fps max update rate
 
   return {
     update: (label: string, current?: number, total?: number) => {
-      if (current !== undefined && total !== undefined) {
-        write(label, current, total);
+      const now = Date.now();
+
+      if (current !== undefined && total !== undefined && total > 0) {
+        // Throttle updates but always show first and last
+        const isFirst = current === 0;
+        const isLast = current === total;
+        const shouldUpdate = isFirst || isLast || now - lastUpdate >= throttleMs;
+
+        if (shouldUpdate) {
+          lastUpdate = now;
+          const percent = current / total;
+          const filled = Math.round(barWidth * percent);
+          const empty = barWidth - filled;
+          const bar = "█".repeat(filled) + "░".repeat(empty);
+          process.stdout.write(`\r  ${label} [${bar}] ${current}/${total}`);
+        }
       } else {
-        // Just show label with spinner for indeterminate state
-        process.stdout.write(`\r\x1b[K  ⠋ ${label}`);
+        process.stdout.write(`\r  ⏳ ${label}`);
       }
     },
     stop: () => {
-      process.stdout.write("\r\x1b[K"); // Clear line
+      process.stdout.write("\n");
     },
   };
 }
@@ -629,9 +634,15 @@ function createProgress() {
     // Load plans with progress bar
     const progress = createProgress();
 
-    await loadPlans((stage, current, total) => {
-      progress.update(stage, current, total);
-    });
+    try {
+      await loadPlans((stage, current, total) => {
+        progress.update(stage, current, total);
+      });
+    } catch (err) {
+      progress.stop();
+      console.error("Error loading plans:", err);
+      throw err;
+    }
 
     const projects = new Set(
       (cachedPlans || []).map((p) => p.project).filter(Boolean)

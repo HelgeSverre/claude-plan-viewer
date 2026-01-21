@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Claude Plan Viewer is a web-based viewer for Claude Code plan files (`~/.claude/plans/*.md`). It provides a React frontend with a Bun-powered backend that serves plan metadata and content via REST API.
 
+**Website:** https://claudeplans.dev
+
 ## Commands
 
 ```bash

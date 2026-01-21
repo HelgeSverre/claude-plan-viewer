@@ -50,7 +50,7 @@
   "bugs": {
     "url": "https://github.com/HelgeSverre/claude-plan-viewer/issues"
   },
-  "homepage": "https://github.com/HelgeSverre/claude-plan-viewer#readme",
+  "homepage": "https://claudeplans.dev",
   "engines": {
     "bun": ">=1.0.0"
   },

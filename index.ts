@@ -6,6 +6,7 @@ import index from "./src/index.html";
 import apiDocs from "./src/api-docs.html";
 import pkg from "./package.json";
 import openapi from "./openapi.json";
+import getPort, { portNumbers } from "get-port";
 
 // Resolved at startup based on --claude-dir flag or CLAUDE_DIR env var
 let PLANS_DIR: string;
@@ -22,6 +23,7 @@ function initializeDirectories(claudeDir: string): void {
 
 interface CliArgs {
   port?: number;
+  host?: string;
   json?: boolean;
   output?: string;
   fromFile?: string;
@@ -41,6 +43,11 @@ function parseCliArgs(): CliArgs {
     if (arg === "--port" || arg === "-p") {
       if (nextArg && !nextArg.startsWith("-")) {
         args.port = parseInt(nextArg, 10);
+        i++;
+      }
+    } else if (arg === "--host" || arg === "-H") {
+      if (nextArg && !nextArg.startsWith("-")) {
+        args.host = nextArg;
         i++;
       }
     } else if (arg === "--json" || arg === "-j") {
@@ -78,6 +85,8 @@ Usage: claude-plan-viewer [options]
 
 Options:
   -p, --port <number>       Port to start server on (default: 3000)
+  -H, --host <address>      Host to bind to (default: localhost)
+                            Use 0.0.0.0 to listen on all interfaces
   -c, --claude-dir <path>   Path to .claude directory (default: ~/.claude)
                             Can also be set via CLAUDE_DIR environment variable
   -j, --json                Export all plans as JSON and exit
@@ -89,6 +98,7 @@ Options:
 Examples:
   claude-plan-viewer                        Start viewer on default port
   claude-plan-viewer -p 8080                Start on port 8080
+  claude-plan-viewer -H 0.0.0.0             Listen on all network interfaces
   claude-plan-viewer -c /path/to/.claude    Use custom .claude directory
   claude-plan-viewer -j -o plans.json       Export plans to file
   claude-plan-viewer -f plans.json          Load plans from exported file
@@ -147,24 +157,7 @@ async function loadPlansFromFile(filepath: string): Promise<PlanMetadata[]> {
 
 // Find an available port starting from the requested port
 async function findAvailablePort(startPort: number = 3000): Promise<number> {
-  let port = startPort;
-  const maxAttempts = 100;
-
-  for (let i = 0; i < maxAttempts; i++) {
-    try {
-      const testServer = Bun.serve({
-        port,
-        fetch: () => new Response(),
-      });
-      testServer.stop();
-      return port;
-    } catch {
-      port++;
-    }
-  }
-  throw new Error(
-    `No available port found in range ${startPort}-${startPort + maxAttempts}`,
-  );
+  return getPort({ port: portNumbers(startPort, startPort + 100) });
 }
 
 // Cross-platform open file in default editor
@@ -346,8 +339,11 @@ let cachedPlans: PlanMetadata[] | null = null;
 let cachedProjectMapping: ProjectMapping | null = null;
 const contentCache = new Map<string, string>();
 
-async function loadPlans(): Promise<PlanMetadata[]> {
+async function loadPlans(
+  onProgress?: (stage: string, current?: number, total?: number) => void
+): Promise<PlanMetadata[]> {
   // Build or use cached project mapping
+  onProgress?.("Scanning projects...");
   let projectMapping: ProjectMapping;
   if (!cachedProjectMapping) {
     projectMapping = await buildProjectMapping();
@@ -358,42 +354,57 @@ async function loadPlans(): Promise<PlanMetadata[]> {
 
   const files = await readdir(PLANS_DIR);
   const mdFiles = files.filter((f) => f.endsWith(".md"));
+  const total = mdFiles.length;
 
-  const plans = await Promise.all(
-    mdFiles.map(async (filename) => {
-      const filepath = join(PLANS_DIR, filename);
-      const file = Bun.file(filepath);
+  onProgress?.("Loading plans...", 0, total);
 
-      const [content, stats] = await Promise.all([file.text(), stat(filepath)]);
+  // Process in batches to show progress (batch size balances speed vs visibility)
+  const batchSize = 50;
+  const plans: PlanMetadata[] = [];
 
-      const titleMatch = content.match(/^#\s+(.+)$/m);
-      const title = titleMatch?.[1]
-        ? titleMatch[1].replace(/^Plan:\s*/i, "")
-        : filename.replace(".md", "");
+  for (let i = 0; i < mdFiles.length; i += batchSize) {
+    const batch = mdFiles.slice(i, i + batchSize);
+    const batchPlans = await Promise.all(
+      batch.map(async (filename) => {
+        const filepath = join(PLANS_DIR, filename);
+        const file = Bun.file(filepath);
 
-      // Look up project from metadata using plan slug (filename without .md)
-      const slug = filename.replace(".md", "");
-      const lineCount = content.split("\n").length;
-      const wordCount = content.split(/\s+/).filter(Boolean).length;
+        const [content, stats] = await Promise.all([
+          file.text(),
+          stat(filepath),
+        ]);
 
-      const metadata = projectMapping[slug];
-      // Cache content separately for search and lazy loading
-      contentCache.set(filename, content);
+        const titleMatch = content.match(/^#\s+(.+)$/m);
+        const title = titleMatch?.[1]
+          ? titleMatch[1].replace(/^Plan:\s*/i, "")
+          : filename.replace(".md", "");
 
-      return {
-        filename,
-        filepath,
-        title,
-        size: stats.size,
-        modified: stats.mtime.toISOString(),
-        created: stats.birthtime.toISOString(),
-        lineCount,
-        wordCount,
-        project: metadata?.project || null,
-        sessionId: metadata?.sessionId || null,
-      };
-    }),
-  );
+        // Look up project from metadata using plan slug (filename without .md)
+        const slug = filename.replace(".md", "");
+        const lineCount = content.split("\n").length;
+        const wordCount = content.split(/\s+/).filter(Boolean).length;
+
+        const metadata = projectMapping[slug];
+        // Cache content separately for search and lazy loading
+        contentCache.set(filename, content);
+
+        return {
+          filename,
+          filepath,
+          title,
+          size: stats.size,
+          modified: stats.mtime.toISOString(),
+          created: stats.birthtime.toISOString(),
+          lineCount,
+          wordCount,
+          project: metadata?.project || null,
+          sessionId: metadata?.sessionId || null,
+        };
+      }),
+    );
+    plans.push(...batchPlans);
+    onProgress?.("Loading plans...", plans.length, total);
+  }
 
   cachedPlans = plans;
   return plans;
@@ -440,12 +451,13 @@ async function watchPlansDirectory() {
 }
 
 // Main server startup
-async function startServer() {
+async function startServer(host?: string) {
   const args = parseCliArgs();
   const port = await findAvailablePort(args.port ?? 3000);
 
   const server = Bun.serve({
     port,
+    hostname: host,
     routes: {
       "/": index,
       "/api": () => Response.redirect("/api/", 301),
@@ -542,16 +554,37 @@ async function startServer() {
   return server;
 }
 
-// ANSI color codes
-const c = {
-  reset: "\x1b[0m",
-  bold: "\x1b[1m",
-  dim: "\x1b[2m",
-  green: "\x1b[32m",
-  cyan: "\x1b[36m",
-  yellow: "\x1b[33m",
-  magenta: "\x1b[35m",
-};
+// OSC 8 hyperlink escape sequence for clickable terminal URLs
+function link(url: string, text?: string): string {
+  return `\x1b]8;;${url}\x07${text ?? url}\x1b]8;;\x07`;
+}
+
+// Progress bar for loading indication
+function createProgress() {
+  const barWidth = 20;
+
+  const write = (label: string, current: number, total: number) => {
+    const percent = total > 0 ? current / total : 0;
+    const filled = Math.round(barWidth * percent);
+    const empty = barWidth - filled;
+    const bar = "█".repeat(filled) + "░".repeat(empty);
+    process.stdout.write(`\r\x1b[K  ${label} [${bar}] ${current}/${total}`);
+  };
+
+  return {
+    update: (label: string, current?: number, total?: number) => {
+      if (current !== undefined && total !== undefined) {
+        write(label, current, total);
+      } else {
+        // Just show label with spinner for indeterminate state
+        process.stdout.write(`\r\x1b[K  ⠋ ${label}`);
+      }
+    },
+    stop: () => {
+      process.stdout.write("\r\x1b[K"); // Clear line
+    },
+  };
+}
 
 // Main entry point
 (async () => {
@@ -576,8 +609,12 @@ const c = {
     process.exit(0);
   }
 
-  // Pre-load plans from file if --from-file is provided
+  // Start server first
+  const server = await startServer(args.host);
+
+  // Pre-load plans from file or directory
   let planCount: number;
+  let projectCount = 0;
   let sourceDisplay: string;
 
   if (args.fromFile) {
@@ -585,32 +622,37 @@ const c = {
     planCount = plans.length;
     sourceDisplay = args.fromFile;
   } else {
-    planCount = (await readdir(PLANS_DIR)).filter((f) =>
-      f.endsWith(".md"),
-    ).length;
     sourceDisplay = PLANS_DIR;
     // Only watch for file changes when not using --from-file
     watchPlansDirectory();
+
+    // Load plans with progress bar
+    const progress = createProgress();
+
+    await loadPlans((stage, current, total) => {
+      progress.update(stage, current, total);
+    });
+
+    const projects = new Set(
+      (cachedPlans || []).map((p) => p.project).filter(Boolean)
+    );
+    projectCount = projects.size;
+    planCount = cachedPlans?.length ?? 0;
+
+    progress.stop();
   }
 
-  const server = await startServer();
+  const localUrl = `http://localhost:${server.port}/`;
+  const apiUrl = `http://localhost:${server.port}/api/`;
+  const dirUrl = `file://${claudeDir}`;
 
-  console.log();
-  console.log(`${c.bold}${c.magenta}  📋 Claude Plan Viewer${c.reset}`);
-  console.log(`${c.dim}  ─────────────────────────────${c.reset}`);
-  console.log(`${c.green}  ✓${c.reset} Server running`);
-  if (!args.fromFile) {
-    console.log(`${c.green}  ✓${c.reset} Watching for file changes`);
+  console.log(`\nclaude-plan-viewer v${pkg.version}\n`);
+  console.log(`  ➜  Web:    ${link(localUrl)}`);
+  console.log(`  ➜  API:    ${link(apiUrl)}`);
+  if (args.fromFile) {
+    console.log(`  ➜  Source: ${sourceDisplay}`);
+  } else {
+    console.log(`  ➜  Dir:    ${link(dirUrl)} (${projectCount} projects)`);
   }
-  console.log();
-  console.log(
-    `${c.dim}  Local:${c.reset}   ${c.cyan}${c.bold}http://localhost:${server.port}${c.reset}`,
-  );
-  console.log(
-    `${c.dim}  API:${c.reset}     ${c.cyan}http://localhost:${server.port}/api/${c.reset}`,
-  );
-  console.log(
-    `${c.dim}  Plans:${c.reset}   ${c.yellow}${planCount} plans${c.reset} in ${c.dim}${sourceDisplay}${c.reset}`,
-  );
-  console.log();
+  console.log(`\n  Serving ${planCount} plans\n`);
 })();

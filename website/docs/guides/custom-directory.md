@@ -1,9 +1,9 @@
 ---
-title: Custom Directory
+title: Use a Custom Directory
 description: Configure Claude Plan Viewer to use a non-standard .claude directory location
 ---
 
-# Custom Directory
+# Use a Custom Directory
 
 ## Overview
 

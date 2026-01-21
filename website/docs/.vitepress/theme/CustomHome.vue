@@ -60,7 +60,7 @@ async function copyToClipboard(text: string, key: string) {
                 <nav :class="{ open: mobileMenuOpen }">
                     <a href="#features" @click="mobileMenuOpen = false">Features</a>
                     <a href="#installation" @click="mobileMenuOpen = false">Installation</a>
-                    <a href="/getting-started/quickstart" @click="mobileMenuOpen = false">Docs</a>
+                    <a href="/introduction/quickstart" @click="mobileMenuOpen = false">Docs</a>
                     <a
                         href="https://github.com/HelgeSverre/claude-plan-viewer"
                         target="_blank"

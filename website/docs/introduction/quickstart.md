@@ -64,10 +64,12 @@ Navigate efficiently without touching your mouse:
 
 | Shortcut | Action |
 |----------|--------|
-| `Cmd + K` | Focus search bar |
-| `j` / `k` | Navigate up/down through plan list |
-| `Enter` | Open selected plan |
-| `Esc` | Clear selection / close detail panel |
+| `Cmd + K` | Focus and select search bar |
+| `↑` / `↓` | Navigate up/down through plan list |
+| `Enter` | Open selected plan in default editor |
+| `F` | Toggle fullscreen reading mode |
+| `?` | Show keyboard shortcuts help |
+| `Esc` | Clear search / close modals |
 
 ::: info
 On Windows and Linux, use `Ctrl` instead of `Cmd`.
@@ -75,7 +77,7 @@ On Windows and Linux, use `Ctrl` instead of `Cmd`.
 
 ## Next Steps
 
-- [Installation Options](/getting-started/installation) - Install globally or download standalone binaries
-- [CLI Reference](/reference/cli) - Explore all command-line options
-- [JSON Export](/features/json-export) - Export your plans for backup or processing
-- [API Reference](/reference/api) - Integrate with the REST API
+- [Installation Options](/introduction/installation) - Install globally or download standalone binaries
+- [CLI Reference](/integrations/cli) - Explore all command-line options
+- [JSON Export](/guides/json-export) - Export your plans for backup or processing
+- [API Reference](/integrations/api) - Integrate with the REST API

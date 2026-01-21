@@ -161,5 +161,5 @@ You should see the version number printed to the console.
 
 ## Next Steps
 
-- [Quick Start](/getting-started/quickstart) - Get up and running in under a minute
-- [CLI Reference](/reference/cli) - Explore all command-line options
+- [Quick Start](/introduction/quickstart) - Get up and running in under a minute
+- [CLI Reference](/integrations/cli) - Explore all command-line options

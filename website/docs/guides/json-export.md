@@ -1,9 +1,9 @@
 ---
-title: JSON Export
+title: Export Plans to JSON
 description: Export all your Claude Code plans to JSON format for backup, processing, or migration
 ---
 
-# JSON Export
+# Export Plans to JSON
 
 ## Overview
 

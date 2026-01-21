@@ -1,9 +1,9 @@
 ---
-title: Load from File
+title: Load Plans from a File
 description: View plans from an exported JSON file instead of the live plans directory
 ---
 
-# Load from File
+# Load Plans from a File
 
 ## Overview
 
@@ -51,8 +51,12 @@ When loading from a file, the following behaviors change:
 |---------|-------------|----------------|
 | File watching | Enabled | Disabled |
 | Live updates | Yes | No |
-| Refresh API | Reloads from disk | No effect |
+| Refresh API | Reloads from disk | Reloads from disk (not JSON file) |
 | Open in editor | Works | May fail if paths differ |
+
+::: warning
+Calling the refresh API (`POST /api/refresh`) in from-file mode will reload plans from the default `~/.claude/plans` directory, replacing your JSON snapshot.
+:::
 
 ## Use Cases
 
@@ -62,5 +66,5 @@ When loading from a file, the following behaviors change:
 - **Demo Mode** - Present plans in environments without Claude Code installed
 
 ::: info
-The JSON file must match the format produced by `--json` export. See [JSON Export](/features/json-export) for details on the expected structure.
+The JSON file must match the format produced by `--json` export. See [JSON Export](/guides/json-export) for details on the expected structure.
 :::

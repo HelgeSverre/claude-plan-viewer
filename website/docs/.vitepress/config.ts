@@ -32,44 +32,39 @@ export default defineConfig({
       height: 28,
     },
 
-    nav: [
-      { text: "Guide", link: "/getting-started/quickstart" },
-      { text: "Reference", link: "/reference/cli" },
-      {
-        text: "GitHub",
-        link: "https://github.com/HelgeSverre/claude-plan-viewer",
-      },
-    ],
+    nav: [],
 
     sidebar: [
       {
         text: "Getting Started",
         items: [
-          { text: "Quick Start", link: "/getting-started/quickstart" },
-          { text: "Installation", link: "/getting-started/installation" },
+          { text: "Overview", link: "/introduction/overview" },
+          { text: "Installation", link: "/introduction/installation" },
+          { text: "Quick Start", link: "/introduction/quickstart" },
+        ],
+      },
+      {
+        text: "Usage",
+        items: [
+          { text: "Load from JSON", link: "/guides/load-from-json" },
+          { text: "Custom Directory", link: "/guides/custom-directory" },
+          { text: "JSON Export", link: "/guides/json-export" },
         ],
       },
       {
         text: "Reference",
         items: [
-          { text: "CLI Options", link: "/reference/cli" },
+          { text: "CLI", link: "/reference/cli" },
           { text: "REST API", link: "/reference/api" },
           { text: "API Playground", link: "/reference/api-playground" },
+          { text: "Troubleshooting", link: "/reference/troubleshooting" },
         ],
       },
       {
-        text: "Features",
+        text: "Contributing",
         items: [
-          { text: "JSON Export", link: "/features/json-export" },
-          { text: "Load from File", link: "/features/load-from-file" },
-          { text: "Custom Directory", link: "/features/custom-directory" },
-        ],
-      },
-      {
-        text: "Development",
-        items: [
-          { text: "Building", link: "/development/building" },
-          { text: "Testing", link: "/development/testing" },
+          { text: "Building", link: "/contributing/building" },
+          { text: "Testing", link: "/contributing/testing" },
         ],
       },
     ],

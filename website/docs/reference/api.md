@@ -7,8 +7,10 @@ description: REST API endpoints for Claude Plan Viewer
 
 Claude Plan Viewer exposes a REST API for programmatic access to your Claude Code plans. The API is designed for fast initial loads with lazy content fetching.
 
-::: info
-The full OpenAPI 3.0 specification is available at `/api/openapi.json` when the server is running.
+::: tip OpenAPI Specification
+The full OpenAPI 3.0 specification is available:
+- **Static**: [openapi.json](/openapi.json) (for import into API tools)
+- **Live**: `/api/openapi.json` when the server is running
 :::
 
 ## Base URL
@@ -248,6 +250,8 @@ curl -X POST http://localhost:3000/api/open \
 **GET** `/api/openapi.json`
 
 Returns the complete OpenAPI 3.0 specification for the API. Use this for generating client libraries, API documentation, or integrating with API tools.
+
+You can also download the specification directly: **[openapi.json](/openapi.json)**
 
 ### Example Request
 

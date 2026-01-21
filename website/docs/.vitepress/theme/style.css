@@ -62,7 +62,7 @@
   --vp-c-bg: #1a1918;
   --vp-c-bg-soft: #252422;
   --vp-c-bg-mute: #2f2d2a;
-  --vp-c-bg-alt: #1a1918;
+  --vp-c-bg-alt: #141312;  /* Darker than page bg for code blocks */
 
   --vp-c-border: #3d3a35;
   --vp-c-divider: #3d3a35;
@@ -71,8 +71,12 @@
   --vp-sidebar-bg-color: #1a1918;
   --vp-nav-bg-color: #1a1918;
 
+  /* Inline code */
   --vp-code-color: #e08a70;
   --vp-code-bg: #2f2d2a;
+
+  /* Code blocks */
+  --vp-code-block-bg: #141312;
 }
 
 /* Custom block code contrast fixes */
@@ -92,36 +96,76 @@
   color: #93c5fd;  /* Light blue - good contrast on dark info bg */
 }
 
-/* API Playground page - full width, no sidebar */
-.api-playground-page .VPSidebar {
+/* Scalar API page - keep sidebar, expand content, hide aside */
+.scalar-page .VPDoc .aside {
   display: none !important;
 }
 
-.api-playground-page .VPContent {
-  padding-left: 0 !important;
-}
-
-.api-playground-page .VPDoc {
-  padding: 0 !important;
-}
-
-.api-playground-page .VPDoc .container {
+.scalar-page .VPDoc .content-container {
   max-width: 100% !important;
 }
 
-.api-playground-page .VPDoc .content {
+.scalar-page .VPDoc .content {
   max-width: 100% !important;
-  padding: 0 !important;
+  padding-right: 0 !important;
 }
 
-.api-playground-page .VPDoc .content-container {
-  max-width: 100% !important;
-}
-
-@media (min-width: 960px) {
-  .api-playground-page .VPContent.has-sidebar {
-    padding-left: 0 !important;
+@media (min-width: 1280px) {
+  .scalar-page .VPDoc:not(.has-sidebar) .content {
+    max-width: 100% !important;
   }
+
+  .scalar-page .VPDoc.has-aside .content-container {
+    max-width: 100% !important;
+  }
+}
+
+/* vitepress-openapi customizations */
+.vp-doc .OAOperation {
+  --vp-openapi-accent: var(--vp-c-brand-1);
+}
+
+/* Method badges */
+.vp-doc .OAMethodBadge {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+/* Code samples styling */
+.vp-doc .OACodeSamples pre {
+  border-radius: 8px;
+  border: 1px solid var(--vp-c-border);
+}
+
+/* Schema viewer */
+.vp-doc .OASchemaViewer {
+  background: var(--vp-c-bg-soft);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+/* Response tabs */
+.vp-doc .OAResponses .tabs {
+  border-bottom: 1px solid var(--vp-c-border);
+}
+
+/* Playground styling */
+.vp-doc .OAPlayground {
+  border: 1px solid var(--vp-c-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Operation path styling */
+.vp-doc .OAPath {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--vp-c-bg-soft);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
 }
 
 /* Headings use Georgia serif */

@@ -6,8 +6,11 @@
 
 <script setup>
 import { onMounted } from 'vue'
+import { useData } from 'vitepress'
 
-onMounted(async () => {
+const { isDark } = useData()
+
+onMounted(() => {
   // Dynamically load Scalar
   const script = document.createElement('script')
   script.src = 'https://cdn.jsdelivr.net/npm/@scalar/api-reference'
@@ -16,40 +19,63 @@ onMounted(async () => {
       spec: {
         url: '/openapi.json'
       },
-      theme: 'kepler',
+      // Theme & Layout
+      theme: 'saturn',
+      layout: 'modern',
+      darkMode: isDark.value,
+      withDefaultFonts: true,
+
+      // Metadata
+      title: 'Claude Plan Viewer API',
+
+      // Sidebar & Navigation
+      showSidebar: true,
+      defaultOpenAllTags: false,
+
+      // UI Elements
       hideDownloadButton: false,
+      hideDarkModeToggle: true,
+      hideClientButton: true,
+      hideSearch: true,
+      hideTestRequestButton: true,
       hideModels: false,
-      hideDarkModeToggle: true, // VitePress handles this
-      darkMode: document.documentElement.classList.contains('dark')
+
+      // Operation Display
+      operationTitleSource: 'summary',
+      showOperationId: false,
+      expandAllModelSections: true,
+      expandAllResponses: false,
+
+      // Schema Display
+      orderSchemaPropertiesBy: 'alpha',
+      orderRequiredPropertiesFirst: true,
+
+      // Developer Tools
+      showDeveloperTools: 'never',
+      showToolbar: 'never',
+
+      // Download & Export
+      documentDownloadType: 'both',
+
+      // Privacy & Other
+      telemetry: false,
+      persistAuth: false,
+      isEditable: false,
+      searchHotKey: 'k',
     })
   }
   document.head.appendChild(script)
-
-  // Watch for dark mode changes
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.attributeName === 'class') {
-        const isDark = document.documentElement.classList.contains('dark')
-        // Scalar will pick up the change via CSS variables
-        const container = document.getElementById('scalar-api-reference')
-        if (container) {
-          container.classList.toggle('dark-mode', isDark)
-        }
-      }
-    })
-  })
-  observer.observe(document.documentElement, { attributes: true })
 })
 </script>
 
 <style scoped>
 .api-reference-container {
-  min-height: 100vh;
+  min-height: 80vh;
   width: 100%;
 }
 
 /* Override Scalar styles to match VitePress theme */
-:deep(.scalar-api-reference) {
+:deep(.scalar-app) {
   --scalar-font: var(--vp-font-family-base);
   --scalar-color-1: var(--vp-c-text-1);
   --scalar-color-2: var(--vp-c-text-2);

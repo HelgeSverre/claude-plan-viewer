@@ -4,6 +4,13 @@ export default defineConfig({
   title: 'Claude Plan Viewer',
   description: 'Browse, search, and read your Claude Code plans',
 
+  // TODO: Update hostname when deployed
+  sitemap: {
+    hostname: 'https://claude-plan-viewer.helgesver.re'
+  },
+
+  lastUpdated: true,
+
   ignoreDeadLinks: [
     /^http:\/\/localhost/
   ],

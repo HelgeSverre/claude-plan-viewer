@@ -1,13 +1,13 @@
 {
   "name": "claude-plan-viewer-docs",
+  "devDependencies": {
+    "vitepress": "^1.6.3"
+  },
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",
     "preview": "vitepress preview"
   },
-  "devDependencies": {
-    "vitepress": "^1.6.3"
-  }
+  "type": "module"
 }

@@ -11,8 +11,8 @@
   },
   "servers": [
     {
-      "url": "/",
-      "description": "Current server"
+      "url": "http://localhost:3000",
+      "description": "Local Claude Plan Viewer (run with: bunx claude-plan-viewer)"
     }
   ],
   "paths": {

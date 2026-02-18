@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.5.0] - 2026-02-18
+
+### Changed
+
+- Stream JSONL files line-by-line instead of loading entire files into memory (heap: 8.4GB → 26MB)
+- Only track plan slugs that match actual plan files, skipping unrelated JSONL entries
+- Process project JSONL files sequentially to prevent concurrent memory spikes
+- `/api/refresh` no longer re-scans project mapping (only refreshes plan metadata and content)
+- Increased API test timeouts for large project directories
+
+### Added
+
+- Documentation site with VitePress
+- Scalar API playground and npm social link
+- `get-port` library for automatic port selection
+- `--host` flag to bind to specific network interfaces
+- Dynamic theme support for API docs
+- Sitemap and llms.txt for documentation site
+- Troubleshooting guide in reference docs
+- Smooth scrolling with reduced motion support
+
+### Fixed
+
+- Documentation paths corrected to use `/reference/`
+- White npm logo for dark mode on website
+
 ## [1.4.1] - 2026-01-09
 
 ### Fixed

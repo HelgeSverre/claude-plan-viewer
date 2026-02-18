@@ -1,27 +1,41 @@
-# Marketing website (deployed separately via Vercel)
+# Website (deployed separately via Vercel)
 website/
 
-# Work in progress / prototypes
-wip/
-
-# Documentation (deployed separately via Mintlify)
+# Documentation (deployed separately)
 docs/
+
+# Compiled binaries
+dist/
 
 # Development/test files
 test/
 e2e/
-*.test.ts
-playwright.config.ts
 test-results/
 playwright-report/
+*.test.ts
+playwright.config.ts
+
+# Scripts and config
+scripts/
+.github/
+.claude/
+.idea/
+.vscode/
+tsconfig.json
+bun.lock
+
+# Images and data files
+screenshot.png
+wip.json
+wip/
+
+# Project docs (not needed for npm consumers)
+CLAUDE.md
+DEPLOYMENT.md
 
 # Build artifacts
 out/
 *.tgz
-
-# IDE/Editor
-.idea/
-.vscode/
 
 # Misc
 .DS_Store

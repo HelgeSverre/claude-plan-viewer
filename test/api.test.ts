@@ -1,5 +1,8 @@
-import { test, expect, describe, beforeAll, afterAll } from "bun:test";
+import { test, expect, describe, beforeAll, afterAll, setDefaultTimeout } from "bun:test";
 import type { Server } from "bun";
+
+// Server may need time to scan large ~/.claude/projects directories
+setDefaultTimeout(30000);
 
 // ============================================================================
 // API Endpoint Tests
@@ -18,8 +21,8 @@ beforeAll(async () => {
     stderr: "pipe",
   });
 
-  // Wait for server to be ready
-  const maxWait = 5000;
+  // Wait for server to be ready (may take time to scan large project dirs)
+  const maxWait = 30000;
   const startTime = Date.now();
   while (Date.now() - startTime < maxWait) {
     try {
@@ -28,9 +31,9 @@ beforeAll(async () => {
     } catch {
       // Server not ready yet
     }
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
-});
+}, 30000);
 
 afterAll(() => {
   if (serverProcess) {

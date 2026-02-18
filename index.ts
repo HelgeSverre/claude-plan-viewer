@@ -1,7 +1,9 @@
 #!/usr/bin/env bun
 import { readdir, stat, watch } from "node:fs/promises";
+import { createReadStream } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { createInterface } from "node:readline";
 import index from "./src/index.html";
 import apiDocs from "./src/api-docs.html";
 import pkg from "./package.json";
@@ -185,10 +187,6 @@ interface PlanMetadata {
   sessionId: string | null;
 }
 
-interface Plan extends PlanMetadata {
-  content: string;
-}
-
 // Extract project name from a full path (cross-platform)
 // e.g., "/Users/helge/code/plans-viewer" -> "plans-viewer"
 // e.g., "C:\Users\name\code\my-app" -> "my-app"
@@ -205,48 +203,27 @@ function extractProjectName(cwd: string): string {
   return lastSlash === -1 ? trimmed : trimmed.slice(lastSlash + 1);
 }
 
-// Extract cwd (working directory) from JSONL content
-function extractCwdFromJsonl(content: string): string | null {
-  if (!content) return null;
-  const match = content.match(/"cwd":"([^"]+)"/);
-  if (!match || !match[1]) return null;
-  // Unescape JSON string (convert \\\\ to \\)
-  return match[1].replace(/\\\\/g, "\\");
-}
+// Stream a JSONL file line-by-line without loading the entire file into memory
+async function processJsonlLineByLine(
+  path: string,
+  onLine: (line: string) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const stream = createReadStream(path, {
+      encoding: "utf-8",
+      highWaterMark: 64 * 1024,
+    });
+    const rl = createInterface({ input: stream, crlfDelay: Infinity });
 
-// Extract slug -> sessionId mapping from JSONL content
-// Each line in JSONL may contain both "slug" and "sessionId" fields
-function extractSlugSessionMap(content: string): Map<string, string> {
-  if (!content) return new Map();
-  const slugSessionMap = new Map<string, string>();
-
-  // Process each line to find slug and sessionId pairs
-  const lines = content.split("\n");
-  for (const line of lines) {
-    if (!line.trim()) continue;
-
-    const slugMatch = line.match(/"slug":"([\w-]+)"/);
-    const sessionMatch = line.match(/"sessionId":"([^"]+)"/);
-
-    if (slugMatch && slugMatch[1] && sessionMatch && sessionMatch[1]) {
-      slugSessionMap.set(slugMatch[1], sessionMatch[1]);
-    }
-  }
-
-  return slugSessionMap;
-}
-
-// Extract unique slugs from JSONL content (for backwards compatibility)
-function extractSlugsFromJsonl(content: string): string[] {
-  if (!content) return [];
-  const slugs = new Set<string>();
-  const matches = content.matchAll(/"slug":"([\w-]+)"/g);
-  for (const match of matches) {
-    if (match[1]) {
-      slugs.add(match[1]);
-    }
-  }
-  return Array.from(slugs);
+    rl.on("line", (line) => {
+      if (line.length > 0) onLine(line);
+    });
+    rl.on("close", resolve);
+    rl.on("error", (err) => {
+      rl.close();
+      reject(err);
+    });
+  });
 }
 
 interface SlugMetadata {
@@ -258,74 +235,67 @@ interface ProjectMapping {
   [slug: string]: SlugMetadata;
 }
 
-// Build a mapping of plan slugs to project names and session IDs by scanning Claude Code's project metadata
-async function buildProjectMapping(): Promise<ProjectMapping> {
+// Build a mapping of plan slugs to project names and session IDs by scanning Claude Code's project metadata.
+// Streams JSONL files line-by-line to avoid loading multi-GB project data into memory.
+// Only tracks slugs that correspond to actual plan files.
+async function buildProjectMapping(
+  neededSlugs?: Set<string>
+): Promise<ProjectMapping> {
   const mapping: ProjectMapping = {};
 
   try {
     const projectDirs = await readdir(PROJECTS_DIR);
 
-    // Process all project directories in parallel
-    const results = await Promise.all(
-      projectDirs.map(async (dir) => {
-        const dirPath = join(PROJECTS_DIR, dir);
-        try {
-          const dirStats = await stat(dirPath);
-          if (!dirStats.isDirectory()) return null;
+    for (const dir of projectDirs) {
+      const dirPath = join(PROJECTS_DIR, dir);
+      try {
+        const dirStats = await stat(dirPath);
+        if (!dirStats.isDirectory()) continue;
 
-          // Find JSONL files
-          const files = await readdir(dirPath);
-          const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
-          if (jsonlFiles.length === 0) return null;
+        const files = await readdir(dirPath);
+        const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
+        if (jsonlFiles.length === 0) continue;
 
-          // Read all JSONL files in parallel
-          const fileContents = await Promise.all(
-            jsonlFiles.map(async (file) => {
-              try {
-                return await Bun.file(join(dirPath, file)).text();
-              } catch {
-                return null;
+        let projectName: string | null = null;
+        const slugSessionMap = new Map<string, string>();
+
+        // Process files sequentially to keep memory bounded
+        for (const file of jsonlFiles) {
+          try {
+            await processJsonlLineByLine(join(dirPath, file), (line) => {
+              // Extract project name from cwd (only need first occurrence)
+              if (!projectName) {
+                const cwdMatch = line.match(/"cwd":"([^"]+)"/);
+                if (cwdMatch?.[1]) {
+                  const cwd = cwdMatch[1].replace(/\\\\/g, "\\");
+                  projectName = extractProjectName(cwd);
+                }
               }
-            })
-          );
 
-          let projectName: string | null = null;
-          const slugSessionMap = new Map<string, string>();
-
-          // Process file contents
-          for (const content of fileContents) {
-            if (!content) continue;
-
-            // Get project name from cwd (only need to find it once)
-            if (!projectName) {
-              const cwd = extractCwdFromJsonl(content);
-              if (cwd) {
-                projectName = extractProjectName(cwd);
+              // Extract slug-sessionId pairs, filtering to only needed slugs
+              const slugMatch = line.match(/"slug":"([\w-]+)"/);
+              if (
+                slugMatch?.[1] &&
+                (!neededSlugs || neededSlugs.has(slugMatch[1]))
+              ) {
+                const sessionMatch = line.match(/"sessionId":"([^"]+)"/);
+                if (sessionMatch?.[1]) {
+                  slugSessionMap.set(slugMatch[1], sessionMatch[1]);
+                }
               }
-            }
-
-            // Collect slug -> sessionId mappings
-            const fileSlugSessions = extractSlugSessionMap(content);
-            for (const [slug, sessionId] of fileSlugSessions) {
-              slugSessionMap.set(slug, sessionId);
-            }
+            });
+          } catch {
+            // Skip unreadable files
           }
-
-          return { projectName, slugSessionMap };
-        } catch {
-          return null;
         }
-      })
-    );
 
-    // Merge results into mapping
-    for (const result of results) {
-      if (!result?.projectName) continue;
-      for (const [slug, sessionId] of result.slugSessionMap) {
-        mapping[slug] = {
-          project: result.projectName,
-          sessionId: sessionId,
-        };
+        if (projectName) {
+          for (const [slug, sessionId] of slugSessionMap) {
+            mapping[slug] = { project: projectName, sessionId };
+          }
+        }
+      } catch {
+        // Skip inaccessible directories
       }
     }
   } catch {
@@ -340,17 +310,18 @@ let cachedProjectMapping: ProjectMapping | null = null;
 const contentCache = new Map<string, string>();
 
 async function loadPlans(): Promise<PlanMetadata[]> {
-  // Build or use cached project mapping
+  const files = await readdir(PLANS_DIR);
+  const mdFiles = files.filter((f) => f.endsWith(".md"));
+
+  // Build or use cached project mapping, passing needed slugs for targeted lookup
   let projectMapping: ProjectMapping;
   if (!cachedProjectMapping) {
-    projectMapping = await buildProjectMapping();
+    const neededSlugs = new Set(mdFiles.map((f) => f.replace(".md", "")));
+    projectMapping = await buildProjectMapping(neededSlugs);
     cachedProjectMapping = projectMapping;
   } else {
     projectMapping = cachedProjectMapping;
   }
-
-  const files = await readdir(PLANS_DIR);
-  const mdFiles = files.filter((f) => f.endsWith(".md"));
 
   const plans = await Promise.all(
     mdFiles.map(async (filename) => {
@@ -434,9 +405,7 @@ async function watchPlansDirectory() {
 }
 
 // Main server startup
-async function startServer(host?: string) {
-  const args = parseCliArgs();
-  const port = await findAvailablePort(args.port ?? 3000);
+async function startServer(port: number, host?: string) {
 
   const server = Bun.serve({
     port,
@@ -504,7 +473,10 @@ async function startServer(host?: string) {
       "/api/refresh": {
         POST: async () => {
           const before = cachedPlans?.length ?? 0;
-          invalidateAllCaches();
+          // Only invalidate plans and content; project mapping is expensive
+          // to rebuild (streams all JSONL files) and rarely changes
+          invalidatePlansCache();
+          invalidateContentCache();
           await loadPlans();
           const after = cachedPlans?.length ?? 0;
           return Response.json({ success: true, before, after });
@@ -542,7 +514,6 @@ function link(url: string, text?: string): string {
   return `\x1b]8;;${url}\x07${text ?? url}\x1b]8;;\x07`;
 }
 
-
 // Main entry point
 (async () => {
   const args = parseCliArgs();
@@ -567,7 +538,8 @@ function link(url: string, text?: string): string {
   }
 
   // Start server first
-  const server = await startServer(args.host);
+  const port = await findAvailablePort(args.port ?? 3000);
+  const server = await startServer(port, args.host);
 
   // Pre-load plans from file or directory
   let planCount: number;

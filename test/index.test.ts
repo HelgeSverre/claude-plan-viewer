@@ -123,53 +123,6 @@ describe("extractCwdFromJsonl", () => {
 });
 
 // ============================================================================
-// extractSlugsFromJsonl: Find all plan slugs in JSONL content
-// ============================================================================
-
-describe("extractSlugsFromJsonl", () => {
-  // Implementation: Extract unique slugs from JSONL content
-  function extractSlugsFromJsonl(content: string): string[] {
-    if (!content) return [];
-    const slugs = new Set<string>();
-    // Match all "slug":"..." patterns
-    const matches = content.matchAll(/"slug":"([\w-]+)"/g);
-    for (const match of matches) {
-      slugs.add(match[1]);
-    }
-    return Array.from(slugs);
-  }
-
-  test("extracts single slug", () => {
-    const content = '{"slug":"happy-jumping-rabbit","type":"assistant"}';
-    expect(extractSlugsFromJsonl(content)).toEqual(["happy-jumping-rabbit"]);
-  });
-
-  test("extracts multiple unique slugs", () => {
-    const content = `{"slug":"first-slug","type":"user"}
-{"slug":"second-slug","type":"assistant"}
-{"slug":"first-slug","type":"user"}`;
-    expect(extractSlugsFromJsonl(content)).toEqual([
-      "first-slug",
-      "second-slug",
-    ]);
-  });
-
-  test("returns empty array when no slugs found", () => {
-    const content = '{"type":"summary","data":"no slugs"}';
-    expect(extractSlugsFromJsonl(content)).toEqual([]);
-  });
-
-  test("returns empty array for empty content", () => {
-    expect(extractSlugsFromJsonl("")).toEqual([]);
-  });
-
-  test("handles slugs with numbers", () => {
-    const content = '{"slug":"test-123-slug","type":"user"}';
-    expect(extractSlugsFromJsonl(content)).toEqual(["test-123-slug"]);
-  });
-});
-
-// ============================================================================
 // extractSlugSessionMap: Extract slug -> sessionId mappings from JSONL
 // ============================================================================
 
@@ -492,48 +445,6 @@ describe("graceful failure handling", () => {
     test("ignores cwd-like strings not in proper format", () => {
       expect(extractCwdFromJsonl("cwd:/path/fake")).toBeNull();
       expect(extractCwdFromJsonl('"cwd" : "/path/fake"')).toBeNull(); // spaces
-    });
-  });
-
-  // extractSlugsFromJsonl edge cases
-  describe("extractSlugsFromJsonl robustness", () => {
-    function extractSlugsFromJsonl(content: string): string[] {
-      if (!content) return [];
-      const slugs = new Set<string>();
-      const matches = content.matchAll(/"slug":"([\w-]+)"/g);
-      for (const match of matches) {
-        slugs.add(match[1]);
-      }
-      return Array.from(slugs);
-    }
-
-    test("handles null-ish values", () => {
-      expect(extractSlugsFromJsonl("")).toEqual([]);
-      expect(extractSlugsFromJsonl(null as unknown as string)).toEqual([]);
-      expect(extractSlugsFromJsonl(undefined as unknown as string)).toEqual([]);
-    });
-
-    test("handles malformed JSON", () => {
-      expect(extractSlugsFromJsonl("{broken")).toEqual([]);
-      expect(extractSlugsFromJsonl('{"slug":')).toEqual([]);
-    });
-
-    test("ignores invalid slug formats", () => {
-      // Slugs with spaces or special chars should not match
-      expect(extractSlugsFromJsonl('{"slug":"has space"}')).toEqual([]);
-      expect(extractSlugsFromJsonl('{"slug":"has@symbol"}')).toEqual([]);
-    });
-
-    test("handles very large content with many slugs", () => {
-      const slugs = Array.from({ length: 100 }, (_, i) => `slug-${i}`);
-      const content = slugs.map((s) => `{"slug":"${s}"}`).join("\n");
-      const result = extractSlugsFromJsonl(content);
-      expect(result.length).toBe(100);
-    });
-
-    test("deduplicates slugs correctly", () => {
-      const content = '{"slug":"same"}{"slug":"same"}{"slug":"same"}';
-      expect(extractSlugsFromJsonl(content)).toEqual(["same"]);
     });
   });
 

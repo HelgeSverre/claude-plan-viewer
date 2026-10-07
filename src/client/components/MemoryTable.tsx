@@ -35,7 +35,9 @@ function GroupRow({ source }: { source: MemorySource }) {
           </span>
         )}
         <span className="memory-group-count">
-          {pluralize(source.entryCount, "memory")}
+          {source.entryCount === 0 && source.index
+            ? "index only"
+            : pluralize(source.entryCount, "memory")}
         </span>
       </td>
     </tr>

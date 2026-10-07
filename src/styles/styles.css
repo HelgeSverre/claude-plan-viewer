@@ -75,6 +75,7 @@ body {
 
 /* List Panel */
 .list-panel {
+  container-type: inline-size;
   width: 55%;
   min-width: 400px;
   border-right: 1px solid var(--border);
@@ -118,7 +119,15 @@ body {
 
 .search-wrapper {
   position: relative;
-  width: 200px;
+  flex: 0 1 200px;
+  min-width: 110px;
+}
+
+/* Make room for the view switch when the list panel is narrow */
+@container (max-width: 720px) {
+  .header-title {
+    display: none;
+  }
 }
 
 .search-icon {

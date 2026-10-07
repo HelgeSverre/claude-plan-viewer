@@ -85,7 +85,7 @@ describe("extractCwdFromJsonl", () => {
     const match = content.match(/"cwd":"([^"]+)"/);
     if (!match) return null;
     // Unescape JSON string (convert \\\\ to \\)
-    return match[1].replace(/\\\\/g, "\\");
+    return match[1]!.replace(/\\\\/g, "\\");
   }
 
   test("extracts cwd from valid JSONL line", () => {
@@ -140,7 +140,7 @@ describe("extractSlugSessionMap", () => {
       const sessionMatch = line.match(/"sessionId":"([^"]+)"/);
 
       if (slugMatch && sessionMatch) {
-        slugSessionMap.set(slugMatch[1], sessionMatch[1]);
+        slugSessionMap.set(slugMatch[1]!, sessionMatch[1]!);
       }
     }
 
@@ -358,7 +358,7 @@ describe("buildProjectMapping integration", () => {
       },
     ];
     const mapping = buildProjectMappingFromData(data);
-    expect(mapping["test-plan"].sessionId).toBe(
+    expect(mapping["test-plan"]!.sessionId).toBe(
       "05723b08-43ce-4ee1-a0dd-842991cad4bd",
     );
   });
@@ -416,7 +416,7 @@ describe("graceful failure handling", () => {
       if (!content) return null;
       const match = content.match(/"cwd":"([^"]+)"/);
       if (!match) return null;
-      return match[1].replace(/\\\\/g, "\\");
+      return match[1]!.replace(/\\\\/g, "\\");
     }
 
     test("handles null-ish values", () => {

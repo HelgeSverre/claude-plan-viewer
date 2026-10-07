@@ -130,6 +130,34 @@ curl http://localhost:3000/api/plans/refactor-auth-module.md/content
 
 ---
 
+## Search Plan Content
+
+**GET** `/api/search?q={query}`
+
+Returns the filenames of plans whose markdown content contains the query (case-insensitive). The web UI combines this with client-side matching on title, filename, and project.
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `q` | `string` | Yes | Search text; an empty query returns no matches |
+
+### Example Request
+
+```bash
+curl "http://localhost:3000/api/search?q=jwt"
+```
+
+### Example Response
+
+```json
+{
+  "filenames": ["refactor-auth-module.md"]
+}
+```
+
+---
+
 ## List Projects
 
 **GET** `/api/projects`
@@ -215,7 +243,7 @@ Opens the specified plan file in the system's default editor. This uses the oper
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `filepath` | `string` | Yes | Absolute path to the plan file |
+| `filepath` | `string` | Yes | `filepath` of a plan as returned by `/api/plans`; any other path is rejected |
 
 ### Example Request
 
@@ -243,7 +271,7 @@ curl -X POST http://localhost:3000/api/open \
 
 | Status | Description |
 |--------|-------------|
-| 400 | Invalid path (e.g., path traversal attempt or non-.md file) |
+| 400 | Invalid path (not a known plan file, or malformed body) |
 | 500 | Failed to open file (e.g., editor not available) |
 
 ### Use Cases

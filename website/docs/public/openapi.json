@@ -82,6 +82,44 @@
         }
       }
     },
+    "/api/search": {
+      "get": {
+        "summary": "Search plan content",
+        "description": "Returns filenames of plans whose markdown content contains the query (case-insensitive). Title, filename and project matching happens client-side against /api/plans.",
+        "operationId": "searchPlans",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Search text",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching plan filenames",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "filenames": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects": {
       "get": {
         "summary": "List all projects",
@@ -144,11 +182,13 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["filepath"],
+                "required": [
+                  "filepath"
+                ],
                 "properties": {
                   "filepath": {
                     "type": "string",
-                    "description": "Absolute path to the plan file"
+                    "description": "filepath of a plan as returned by /api/plans; any other path is rejected"
                   }
                 }
               }

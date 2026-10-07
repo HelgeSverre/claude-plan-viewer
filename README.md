@@ -136,6 +136,7 @@ The viewer exposes a REST API for programmatic access:
 | ------------------------------- | ------ | -------------------------- |
 | `/api/plans`                    | GET    | List all plans (metadata)  |
 | `/api/plans/{filename}/content` | GET    | Get plan markdown content  |
+| `/api/search?q=`                | GET    | Search plan content        |
 | `/api/projects`                 | GET    | List all project names     |
 | `/api/refresh`                  | POST   | Force cache refresh        |
 | `/api/open`                     | POST   | Open plan in system editor |

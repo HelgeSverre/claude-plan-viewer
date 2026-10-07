@@ -34,13 +34,14 @@ To pass CLI flags in dev mode: `bun run index.ts -- --from-file plans.json`
 **React SPA** (`src/client/`): Client-side rendered app bundled automatically by Bun's HTML imports.
 - `App.tsx` - Main component, state management, keyboard shortcuts
 - `hooks/usePlans.ts` - SWR-based data fetching with client-side filtering/sorting
+- `hooks/usePlanContent.ts` - SWR content fetch keyed on filename + modified
 - `hooks/useFilters.ts` - URL-synced filter state (search, sort, projects)
 - `components/` - UI components (PlansTable, DetailPanel, Markdown, etc.)
 
 **Data flow**:
 1. `/api/plans` returns metadata only (no content) for fast initial load
 2. `/api/plans/{filename}/content` fetches content on-demand when plan is selected
-3. Client caches content locally to persist across filter changes
+3. Content search goes through `/api/search` (the client never holds all content); title/filename/project matching is client-side
 
 ## API Endpoints
 
@@ -48,6 +49,7 @@ To pass CLI flags in dev mode: `bun run index.ts -- --from-file plans.json`
 |----------|--------|-------------|
 | `/api/plans` | GET | List all plans (metadata only) |
 | `/api/plans/{filename}/content` | GET | Get plan markdown content |
+| `/api/search?q=` | GET | Filenames of plans whose content matches |
 | `/api/projects` | GET | List unique project names |
 | `/api/refresh` | POST | Force cache refresh |
 | `/api/open` | POST | Open plan in system editor |

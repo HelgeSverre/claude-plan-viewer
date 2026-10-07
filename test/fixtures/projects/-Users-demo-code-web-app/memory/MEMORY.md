@@ -1,0 +1,4 @@
+- [No presentational tests](no-presentational-tests.md) — test behaviour, never markup or CSS classes
+- [Testing strategy](testing-strategy.md) — fixtures over live data
+- [zsh gotchas](zsh-gotchas.md) — shell traps that broke scripts before
+- [Release checklist](release-checklist.md) — steps before tagging

@@ -81,14 +81,56 @@ export function parseFrontmatter(content: string): {
   if (!match) return { data: null, body: content };
 
   const body = content.slice(match[0].length);
+  const yaml = match[1] ?? "";
   try {
-    const data = Bun.YAML.parse(match[1] ?? "");
+    const data = Bun.YAML.parse(yaml);
     const isObject =
       data !== null && typeof data === "object" && !Array.isArray(data);
     return { data: isObject ? (data as Record<string, unknown>) : null, body };
   } catch {
-    return { data: null, body };
+    return { data: parseFrontmatterLines(yaml), body };
   }
+}
+
+function unquote(value: string): string {
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value.slice(1, -1);
+    }
+  }
+  if (value.length >= 2 && value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1).replace(/''/g, "'");
+  }
+  return value;
+}
+
+// Fallback for frontmatter Claude Code writes that isn't strict YAML, like
+// unquoted values containing ": ". Handles `key: value` lines plus one level
+// of indented keys under a key with no value (e.g. `metadata:`).
+function parseFrontmatterLines(yaml: string): Record<string, unknown> | null {
+  const data: Record<string, unknown> = {};
+  let nested: Record<string, unknown> | null = null;
+
+  for (const line of yaml.split(/\r?\n/)) {
+    const match = line.match(/^(\s*)([\w.-]+):(?:\s+(.*))?$/);
+    if (!match) continue;
+    const [, indent, key = "", raw = ""] = match;
+    const value = raw.trim();
+
+    if (indent && nested) {
+      nested[key] = unquote(value);
+    } else if (!value) {
+      nested = {};
+      data[key] = nested;
+    } else {
+      nested = null;
+      data[key] = unquote(value);
+    }
+  }
+
+  return Object.keys(data).length > 0 ? data : null;
 }
 
 function stripCode(markdown: string): string {
@@ -170,6 +212,42 @@ export function decodeProjectDirName(
   return walk("", 0);
 }
 
+// Project name for a dir whose path can't be fully decoded (usually deleted):
+// decode the part of the path that still exists, the rest is the name.
+export function projectNameFromDirName(
+  name: string,
+  exists: (path: string) => boolean = existsSync,
+): string {
+  const decoded = decodeProjectDirName(name, exists);
+  if (decoded) return basename(decoded);
+  if (!name.startsWith("-")) return name;
+
+  const parts = name.slice(1).split("-");
+  let path = "";
+  let i = 0;
+  advance: while (i < parts.length - 1) {
+    // Longest existing run, always leaving at least one part for the name
+    for (let j = parts.length - 1; j > i; j--) {
+      const run = parts.slice(i, j);
+      const segments = [run.join("-")];
+      if (run[0] === "" && run.length > 1) {
+        segments.push("." + run.slice(1).join("-"));
+      }
+      for (const segment of segments) {
+        const next = `${path}/${segment}`;
+        // Memory is keyed by git root, so a project never sits inside a repo
+        if (segment && exists(next) && !exists(`${next}/.git`)) {
+          path = next;
+          i = j;
+          continue advance;
+        }
+      }
+    }
+    break;
+  }
+  return parts.slice(i).join("-").replace(/^-+/, "") || name;
+}
+
 const CWD_PATTERN = /"cwd":"((?:[^"\\]|\\.)*)"/;
 const CWD_SCAN_LIMIT = 4 * 1024 * 1024;
 
@@ -244,8 +322,12 @@ async function listMarkdown(dir: string): Promise<string[]> {
   }
 }
 
-function projectName(cwd: string | null, dirName: string): string {
-  if (!cwd) return dirName.replace(/^-/, "");
+function projectName(
+  cwd: string | null,
+  dirName: string,
+  exists: (path: string) => boolean,
+): string {
+  if (!cwd) return projectNameFromDirName(dirName, exists);
   return basename(cwd.replace(/\\/g, "/").replace(/\/$/, "")) || cwd;
 }
 
@@ -459,7 +541,7 @@ export async function scanMemory(
     const cwd =
       (await options.resolveCwd(projectDir)) ??
       decodeProjectDirName(dirName, exists);
-    const project = projectName(cwd, dirName);
+    const project = projectName(cwd, dirName, exists);
 
     // Project and local settings override the user-level directory
     const repoDir = cwd

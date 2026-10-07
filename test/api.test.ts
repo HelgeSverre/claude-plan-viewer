@@ -199,6 +199,91 @@ describe("GET /api/search", () => {
 });
 
 // ============================================================================
+// Memory: /api/memory, /api/memory/content, /api/memory/search
+// ============================================================================
+
+describe("GET /api/memory", () => {
+  const getMemory = async () => (await fetch(`${BASE_URL}/api/memory`)).json();
+
+  test("lists one source per project memory dir, named after its cwd", async () => {
+    const { sources } = await getMemory();
+    expect(
+      sources.map((s: { project: string; kind: string }) => [
+        s.kind,
+        s.project,
+      ]),
+    ).toEqual([
+      ["project", "cli-tool"],
+      ["project", "web-app"],
+    ]);
+  });
+
+  test("reports index budget, orphans and dangling links", async () => {
+    const { sources } = await getMemory();
+    const webApp = sources.find(
+      (s: { project: string }) => s.project === "web-app",
+    );
+    expect(webApp.entryCount).toBe(4);
+    expect(webApp.index).toMatchObject({
+      lines: 4,
+      lineLimit: 200,
+      byteLimit: 25000,
+    });
+    expect(webApp.index.danglingLinks).toEqual(["release-checklist.md"]);
+    expect(webApp.orphans).toEqual(["old-deploy-notes.md"]);
+  });
+
+  test("entries carry frontmatter metadata and links, not content", async () => {
+    const { entries } = await getMemory();
+    const entry = entries.find(
+      (e: { filename: string }) => e.filename === "no-presentational-tests.md",
+    );
+    expect(entry).toMatchObject({
+      name: "no-presentational-tests",
+      type: "feedback",
+      sessionId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      links: ["testing-strategy.md"],
+      linkedFrom: ["MEMORY.md", "testing-strategy.md"],
+      inIndex: true,
+    });
+    expect(entry).not.toHaveProperty("content");
+  });
+
+  test("returns raw content by entry id", async () => {
+    const { entries } = await getMemory();
+    const entry = entries.find(
+      (e: { filename: string }) => e.filename === "old-deploy-notes.md",
+    );
+    const response = await fetch(
+      `${BASE_URL}/api/memory/content?id=${encodeURIComponent(entry.id)}`,
+    );
+    const data = await response.json();
+    expect(data.content).toStartWith("# Old deploy notes");
+  });
+
+  test("returns 404 for unknown entry ids", async () => {
+    const response = await fetch(`${BASE_URL}/api/memory/content?id=nope/x.md`);
+    expect(response.status).toBe(404);
+  });
+
+  test("searches memory content", async () => {
+    const response = await fetch(`${BASE_URL}/api/memory/search?q=KUMQUAT`);
+    const { ids } = await response.json();
+    expect(ids).toEqual(["-Users-demo-code-web-app/testing-strategy.md"]);
+  });
+
+  test("/api/open rejects memory paths that are not entries", async () => {
+    const { entries } = await getMemory();
+    const dir = dirname(entries[0].filepath);
+    expect(
+      (await openFile(`${dir}/../a1b2c3d4-e5f6-7890-abcd-ef1234567890.jsonl`))
+        .status,
+    ).toBe(400);
+    expect((await openFile(`${dir}/not-a-memory.md`)).status).toBe(400);
+  });
+});
+
+// ============================================================================
 // GET /api/projects
 // ============================================================================
 
@@ -322,6 +407,9 @@ describe("GET /api/openapi.json", () => {
     expect(data.paths).toHaveProperty("/api/plans");
     expect(data.paths).toHaveProperty("/api/plans/{filename}/content");
     expect(data.paths).toHaveProperty("/api/search");
+    expect(data.paths).toHaveProperty("/api/memory");
+    expect(data.paths).toHaveProperty("/api/memory/content");
+    expect(data.paths).toHaveProperty("/api/memory/search");
     expect(data.paths).toHaveProperty("/api/projects");
     expect(data.paths).toHaveProperty("/api/refresh");
     expect(data.paths).toHaveProperty("/api/open");

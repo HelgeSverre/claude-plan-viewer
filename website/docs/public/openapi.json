@@ -120,6 +120,115 @@
         }
       }
     },
+    "/api/memory": {
+      "get": {
+        "summary": "List auto memory",
+        "description": "Memory directories and their entries, without content. Scans ~/.claude/projects/*/memory and autoMemoryDirectory settings; cached for 5 seconds.",
+        "operationId": "listMemory",
+        "responses": {
+          "200": {
+            "description": "Memory sources and entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MemorySource"
+                      }
+                    },
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MemoryEntry"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/memory/content": {
+      "get": {
+        "summary": "Get memory content",
+        "description": "Raw markdown of one memory entry, including frontmatter",
+        "operationId": "getMemoryContent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "description": "Entry id from /api/memory",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Memory content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Memory not found"
+          }
+        }
+      }
+    },
+    "/api/memory/search": {
+      "get": {
+        "summary": "Search memory content",
+        "description": "Ids of entries whose raw content contains the query (case-insensitive)",
+        "operationId": "searchMemory",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Search text",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching entry ids",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects": {
       "get": {
         "summary": "List all projects",
@@ -174,7 +283,7 @@
     "/api/open": {
       "post": {
         "summary": "Open plan in editor",
-        "description": "Opens the specified plan file in the system's default editor",
+        "description": "Opens a plan or memory file in the system's default editor",
         "operationId": "openInEditor",
         "requestBody": {
           "required": true,
@@ -188,7 +297,7 @@
                 "properties": {
                   "filepath": {
                     "type": "string",
-                    "description": "filepath of a plan as returned by /api/plans; any other path is rejected"
+                    "description": "filepath of a plan from /api/plans or a memory entry from /api/memory; any other path is rejected"
                   }
                 }
               }
@@ -269,6 +378,162 @@
             "type": "string",
             "nullable": true,
             "description": "Associated Claude Code session ID"
+          }
+        }
+      },
+      "MemoryIndexStats": {
+        "type": "object",
+        "description": "MEMORY.md load budget. Claude Code loads the first lineLimit lines or byteLimit bytes, whichever comes first.",
+        "properties": {
+          "lines": {
+            "type": "integer"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "lineLimit": {
+            "type": "integer",
+            "example": 200
+          },
+          "byteLimit": {
+            "type": "integer",
+            "example": 25000
+          },
+          "danglingLinks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Index links to files that don't exist"
+          }
+        }
+      },
+      "MemorySource": {
+        "type": "object",
+        "description": "One auto memory directory",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "project",
+              "custom"
+            ],
+            "description": "project: ~/.claude/projects/<project>/memory; custom: an autoMemoryDirectory setting"
+          },
+          "project": {
+            "type": "string",
+            "description": "Project name from the session cwd, or \"All projects\" for a user-level autoMemoryDirectory"
+          },
+          "cwd": {
+            "type": "string",
+            "nullable": true
+          },
+          "dir": {
+            "type": "string",
+            "description": "Absolute path of the memory directory"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "False when an autoMemoryDirectory setting means Claude Code no longer uses this directory"
+          },
+          "index": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MemoryIndexStats"
+              }
+            ],
+            "nullable": true
+          },
+          "orphans": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Topic files MEMORY.md doesn't link to"
+          },
+          "entryCount": {
+            "type": "integer",
+            "description": "Number of topic files (excludes MEMORY.md)"
+          },
+          "modified": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MemoryEntry": {
+        "type": "object",
+        "description": "One memory file (MEMORY.md or a topic file)",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "<sourceId>/<filename>"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "filepath": {
+            "type": "string"
+          },
+          "isIndex": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string",
+            "description": "Frontmatter name, first heading, or filename"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "feedback",
+              "project",
+              "reference"
+            ],
+            "nullable": true
+          },
+          "sessionId": {
+            "type": "string",
+            "nullable": true,
+            "description": "originSessionId from frontmatter"
+          },
+          "modified": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Frontmatter modified, or file mtime"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "lineCount": {
+            "type": "integer"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filenames this entry links to (markdown links and [[wikilinks]])"
+          },
+          "linkedFrom": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "inIndex": {
+            "type": "boolean",
+            "description": "Linked from MEMORY.md (always true for MEMORY.md)"
           }
         }
       }

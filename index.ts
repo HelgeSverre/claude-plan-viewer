@@ -9,8 +9,14 @@ import apiDocs from "./src/api-docs.html";
 import pkg from "./package.json";
 import openapi from "./openapi.json";
 import getPort, { portNumbers } from "get-port";
+import {
+  readCwdFromSessionLogs,
+  scanMemory,
+  type MemorySnapshot,
+} from "./src/server/memory.ts";
 
 // Resolved at startup based on --claude-dir flag or CLAUDE_DIR env var
+let CLAUDE_DIR: string;
 let PLANS_DIR: string;
 let PROJECTS_DIR: string;
 // Set by --from-file: plans are served from an exported JSON file instead of PLANS_DIR
@@ -22,6 +28,7 @@ function resolveClaudeDir(cliArg?: string): string {
 
 function initializeDirectories(claudeDir: string): void {
   // Absolute so plan filepaths are stable for /api/open comparisons
+  CLAUDE_DIR = resolve(claudeDir);
   PLANS_DIR = resolve(claudeDir, "plans");
   PROJECTS_DIR = resolve(claudeDir, "projects");
 }
@@ -242,6 +249,7 @@ async function scanJsonl(dir: string, filePath: string): Promise<void> {
       if (cwdMatch?.[1]) {
         const cwd = cwdMatch[1].replace(/\\\\/g, "\\");
         dirProjectNames.set(dir, extractProjectName(cwd));
+        dirCwds.set(join(PROJECTS_DIR, dir), cwd);
       }
     }
 
@@ -406,6 +414,55 @@ function invalidatePlansCache() {
   plansGeneration++;
 }
 
+// Project dir path -> working directory from its session logs (null: none found)
+const dirCwds = new Map<string, string | null>();
+
+async function resolveProjectCwd(projectDir: string): Promise<string | null> {
+  if (!dirCwds.has(projectDir)) {
+    dirCwds.set(projectDir, await readCwdFromSessionLogs(projectDir));
+  }
+  return dirCwds.get(projectDir) ?? null;
+}
+
+// Memory dirs are small but spread over every project dir, so a scan costs
+// ~50-200ms. Cache briefly instead of watching hundreds of directories.
+const MEMORY_TTL_MS = 5000;
+let memoryCache: { snapshot: MemorySnapshot; loadedAt: number } | null = null;
+let memoryLoad: Promise<MemorySnapshot> | null = null;
+
+function getMemory(): Promise<MemorySnapshot> {
+  if (memoryCache && Date.now() - memoryCache.loadedAt < MEMORY_TTL_MS) {
+    return Promise.resolve(memoryCache.snapshot);
+  }
+  if (memoryLoad) return memoryLoad;
+
+  const load = scanMemory({
+    claudeDir: CLAUDE_DIR,
+    projectsDir: PROJECTS_DIR,
+    resolveCwd: resolveProjectCwd,
+  })
+    .then((snapshot) => {
+      if (memoryLoad === load) {
+        memoryCache = { snapshot, loadedAt: Date.now() };
+      }
+      return snapshot;
+    })
+    .finally(() => {
+      if (memoryLoad === load) memoryLoad = null;
+    });
+  memoryLoad = load;
+  return load;
+}
+
+function invalidateMemoryCache() {
+  memoryCache = null;
+  memoryLoad = null;
+  // Retry dirs that had no session logs; known cwds don't change
+  for (const [dir, cwd] of dirCwds) {
+    if (cwd === null) dirCwds.delete(dir);
+  }
+}
+
 // Watch plans directory for changes and invalidate cache
 async function watchPlansDirectory() {
   try {
@@ -474,10 +531,39 @@ async function startServer(port: number, host?: string) {
 
         return Response.json({ filenames });
       },
+      "/api/memory": async () => {
+        // Metadata only - content is fetched via /api/memory/content
+        const { sources, entries } = await getMemory();
+        return Response.json({ sources, entries });
+      },
+      "/api/memory/content": async (req) => {
+        const id = new URL(req.url).searchParams.get("id") ?? "";
+        const content = (await getMemory()).contents.get(id);
+
+        if (content === undefined) {
+          return new Response("Memory not found", { status: 404 });
+        }
+
+        return Response.json({ content });
+      },
+      "/api/memory/search": async (req) => {
+        const q = new URL(req.url).searchParams.get("q")?.trim().toLowerCase();
+        if (!q) {
+          return Response.json({ ids: [] });
+        }
+
+        const { entries, contents } = await getMemory();
+        const ids = entries
+          .filter((e) => (contents.get(e.id) ?? "").toLowerCase().includes(q))
+          .map((e) => e.id);
+
+        return Response.json({ ids });
+      },
       "/api/refresh": {
         POST: async () => {
           const before = cachedPlans?.length ?? 0;
           invalidatePlansCache();
+          invalidateMemoryCache();
           const plans = await getPlans();
           return Response.json({ success: true, before, after: plans.length });
         },
@@ -488,10 +574,13 @@ async function startServer(port: number, host?: string) {
           const filepath =
             typeof body?.filepath === "string" ? resolve(body.filepath) : null;
 
-          // Only open known plan files: `open`/`xdg-open` would happily launch
-          // apps or scripts, and the server may listen on 0.0.0.0
-          const plans = await getPlans();
-          if (!filepath || !plans.some((p) => p.filepath === filepath)) {
+          // Only open known plan and memory files: `open`/`xdg-open` would
+          // happily launch apps or scripts, and the server may listen on 0.0.0.0
+          const [plans, memory] = await Promise.all([getPlans(), getMemory()]);
+          const known =
+            plans.some((p) => p.filepath === filepath) ||
+            memory.entries.some((e) => e.filepath === filepath);
+          if (!filepath || !known) {
             return new Response("Invalid path", { status: 400 });
           }
 
@@ -570,6 +659,8 @@ function link(url: string, text?: string): string {
   }
 
   const plans = await getPlans();
+  // Warm the memory cache so the first Memory view loads instantly
+  getMemory().catch(() => {});
   const planCount = plans.length;
   const projectCount = new Set(plans.map((p) => p.project).filter(Boolean))
     .size;

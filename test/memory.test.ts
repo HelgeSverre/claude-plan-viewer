@@ -7,6 +7,7 @@ import {
   extractLinks,
   countLines,
   decodeProjectDirName,
+  projectNameFromDirName,
   readCwdFromSessionLogs,
   scanMemory,
   type MemorySnapshot,
@@ -31,9 +32,17 @@ describe("parseFrontmatter", () => {
     expect(body).toBe("# Notes\n\nText");
   });
 
-  test("strips malformed frontmatter but returns no data", () => {
-    const { data, body } = parseFrontmatter("---\nname: [unclosed\n---\nBody");
-    expect(data).toBeNull();
+  test("falls back to line parsing for frontmatter that isn't valid YAML", () => {
+    // Claude Code writes unquoted values containing ": " and partial quotes
+    const { data, body } = parseFrontmatter(
+      '---\nname: io-gap\ndescription: Fixed via a pool (was: blocking)\nnote: "Cut a release" means push too\nmetadata:\n  type: project\n  originSessionId: s9\n---\nBody',
+    );
+    expect(data).toEqual({
+      name: "io-gap",
+      description: "Fixed via a pool (was: blocking)",
+      note: '"Cut a release" means push too',
+      metadata: { type: "project", originSessionId: "s9" },
+    });
     expect(body).toBe("Body");
   });
 
@@ -80,6 +89,8 @@ describe("decodeProjectDirName", () => {
     "/Users/demo/code/my-app",
     "/Users/demo/.config",
     "/Users/demo/.config/tool",
+    "/Users/demo/code/crescat",
+    "/Users/demo/code/crescat/.git",
   ]);
   const exists = (p: string) => dirs.has(p);
 
@@ -92,6 +103,22 @@ describe("decodeProjectDirName", () => {
   test("rebuilds dot-prefixed directories", () => {
     expect(decodeProjectDirName("-Users-demo--config-tool", exists)).toBe(
       "/Users/demo/.config/tool",
+    );
+  });
+
+  test("names deleted projects after the part of the path that's gone", () => {
+    expect(projectNameFromDirName("-Users-demo-code-my-app", exists)).toBe(
+      "my-app",
+    );
+    expect(projectNameFromDirName("-Users-demo-code-gone-app", exists)).toBe(
+      "gone-app",
+    );
+    // Not "ingest": a deleted project can't be nested inside another repo
+    expect(
+      projectNameFromDirName("-Users-demo-code-crescat-ingest", exists),
+    ).toBe("crescat-ingest");
+    expect(projectNameFromDirName("C--Users-demo", exists)).toBe(
+      "C--Users-demo",
     );
   });
 

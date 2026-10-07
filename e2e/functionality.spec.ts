@@ -43,19 +43,57 @@ test.describe("Functionality Tests", () => {
     await expect(firstRow).toHaveClass(/selected/);
   });
 
-  test("search filtering works", async ({ page }) => {
-    const searchInput = page.locator("#search");
-    await searchInput.fill("glados");
-    await page.waitForTimeout(500);
+  test("search matches plan content, not just titles", async ({ page }) => {
+    // "JWT" appears only in the body of the "Add User Authentication" fixture
+    await page.locator("#search").fill("jwt");
 
-    // Should have fewer rows
     const rows = page.locator("#plans-table tr");
-    const count = await rows.count();
-    console.log("Rows after search:", count);
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText("Add User Authentication");
+  });
 
-    // Verify search filtered the results
-    expect(count).toBeGreaterThan(0);
-    expect(count).toBeLessThan(100);
+  test("search query is restored from the URL", async ({ page }) => {
+    await page.locator("#search").fill("jwt");
+    await expect(page).toHaveURL(/q=jwt/);
+
+    await page.reload();
+    await expect(page.locator("#search")).toHaveValue("jwt");
+    await expect(page.locator("#plans-table tr")).toHaveCount(1);
+  });
+
+  test("titles containing markup render as text", async ({ page }) => {
+    await expect(page.locator("#plans-table")).toContainText(
+      "Refactor <Button> Components",
+    );
+  });
+
+  test("closing the overlay with Escape keeps the search query", async ({
+    page,
+  }) => {
+    await page.locator("#search").fill("refactor");
+    await expect(page.locator("#plans-table tr")).toHaveCount(1);
+    await page.locator("#search").blur();
+
+    await page.keyboard.press("f");
+    await expect(page.locator(".detail-overlay")).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await expect(page.locator(".detail-overlay")).not.toBeVisible();
+    await expect(page.locator("#search")).toHaveValue("refactor");
+  });
+
+  test("arrow keys in the project filter don't change the selected plan", async ({
+    page,
+  }) => {
+    const selected = page.locator("#plans-table tr.selected");
+    await page.locator("#plans-table tr").first().click();
+    const before = await selected.getAttribute("data-filename");
+
+    await page.locator(".project-select-wrapper input").focus();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+
+    await expect(selected).toHaveAttribute("data-filename", before!);
   });
 
   test("column header sorting works", async ({ page }) => {

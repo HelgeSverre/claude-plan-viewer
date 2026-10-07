@@ -1,19 +1,29 @@
 import { useEffect, useCallback } from "react";
-import type { Plan } from "../types.ts";
+import type { PlanMetadata } from "../types.ts";
 
 interface UseKeyboardOptions {
-  plans: Plan[];
-  selectedPlan: Plan | null;
-  onSelectPlan: (plan: Plan | null) => void;
+  plans: PlanMetadata[];
+  selectedFilename: string | null;
+  overlayOpen: boolean;
+  helpOpen: boolean;
+  onSelectPlan: (plan: PlanMetadata) => void;
   onOpenEditor: () => void;
   onToggleHelp: () => void;
   onToggleOverlay: () => void;
   onClearSearch: () => void;
 }
 
+function isTextField(el: Element | null): boolean {
+  return el?.tagName === "INPUT" || el?.tagName === "TEXTAREA";
+}
+
+// Global shortcuts. Cmd/Ctrl+K lives in SearchInput; the overlay and help
+// modal handle their own Escape/F/? keys, so those are skipped while open.
 export function useKeyboard({
   plans,
-  selectedPlan,
+  selectedFilename,
+  overlayOpen,
+  helpOpen,
   onSelectPlan,
   onOpenEditor,
   onToggleHelp,
@@ -22,21 +32,15 @@ export function useKeyboard({
 }: UseKeyboardOptions): void {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Cmd/Ctrl + K: Focus search
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        const search = document.getElementById("search") as HTMLInputElement;
-        search?.focus();
-        search?.select();
-        return;
-      }
+      if (helpOpen) return;
+      const activeEl = document.activeElement;
 
-      // Arrow navigation
+      // Arrow navigation, also from the search box but not from other fields
+      // (e.g. the project filter dropdown uses arrows for its own options)
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        if (isTextField(activeEl) && activeEl?.id !== "search") return;
         e.preventDefault();
-        const idx = plans.findIndex(
-          (p) => p.filename === selectedPlan?.filename,
-        );
+        const idx = plans.findIndex((p) => p.filename === selectedFilename);
         let newIdx = e.key === "ArrowDown" ? idx + 1 : idx - 1;
         if (newIdx < 0) newIdx = 0;
         if (newIdx >= plans.length) newIdx = plans.length - 1;
@@ -44,27 +48,24 @@ export function useKeyboard({
         if (plan) {
           onSelectPlan(plan);
           document
-            .querySelector(`tr[data-filename="${plan.filename}"]`)
+            .querySelector(`tr[data-filename="${CSS.escape(plan.filename)}"]`)
             ?.scrollIntoView({ block: "nearest" });
         }
         return;
       }
 
+      if (overlayOpen) return;
+
       // Enter: Open in editor
-      if (e.key === "Enter" && selectedPlan) {
-        const activeEl = document.activeElement;
-        if (
-          activeEl?.tagName !== "INPUT" &&
-          activeEl?.tagName !== "TEXTAREA" &&
-          activeEl?.tagName !== "BUTTON"
-        ) {
+      if (e.key === "Enter" && selectedFilename) {
+        if (!isTextField(activeEl) && activeEl?.tagName !== "BUTTON") {
           e.preventDefault();
           onOpenEditor();
         }
         return;
       }
 
-      // Escape: Clear search or close modal
+      // Escape: Clear search
       if (e.key === "Escape") {
         onClearSearch();
         return;
@@ -72,24 +73,22 @@ export function useKeyboard({
 
       // ?: Toggle help
       if (e.key === "?" && !e.metaKey && !e.ctrlKey) {
-        const activeEl = document.activeElement;
-        if (activeEl?.tagName !== "INPUT" && activeEl?.tagName !== "TEXTAREA") {
+        if (!isTextField(activeEl)) {
           e.preventDefault();
           onToggleHelp();
         }
         return;
       }
 
-      // F: Toggle fullscreen overlay
+      // F: Open fullscreen overlay
       if (
         e.key === "f" &&
-        selectedPlan &&
+        selectedFilename &&
         !e.metaKey &&
         !e.ctrlKey &&
         !e.altKey
       ) {
-        const activeEl = document.activeElement;
-        if (activeEl?.tagName !== "INPUT" && activeEl?.tagName !== "TEXTAREA") {
+        if (!isTextField(activeEl)) {
           e.preventDefault();
           onToggleOverlay();
         }
@@ -98,7 +97,9 @@ export function useKeyboard({
     },
     [
       plans,
-      selectedPlan,
+      selectedFilename,
+      overlayOpen,
+      helpOpen,
       onSelectPlan,
       onOpenEditor,
       onToggleHelp,

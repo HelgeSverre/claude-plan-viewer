@@ -125,7 +125,7 @@ export function DetailPanel({
       </div>
 
       <div className="detail-content">
-        {plan.content ? (
+        {plan.content !== undefined ? (
           <Markdown content={plan.content} />
         ) : (
           <div className="loading">Loading content...</div>

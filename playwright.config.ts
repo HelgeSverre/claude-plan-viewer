@@ -9,7 +9,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "bun run index.ts --port 3010",
+    command: "bun run index.ts --port 3010 --claude-dir test/fixtures",
     port: 3010,
     reuseExistingServer: !process.env.CI,
     timeout: 10000,

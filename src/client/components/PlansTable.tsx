@@ -1,19 +1,19 @@
-import type { Plan, SortKey, SortDir } from "../types.ts";
+import type { PlanMetadata, SortKey, SortDir } from "../types.ts";
 import { PlanRow } from "./PlanRow.tsx";
 
 interface PlansTableProps {
-  plans: Plan[];
-  selectedPlan: Plan | null;
+  plans: PlanMetadata[];
+  selectedFilename: string | null;
   searchQuery: string;
   sortKey: SortKey;
   sortDir: SortDir;
-  onSelectPlan: (plan: Plan) => void;
+  onSelectPlan: (plan: PlanMetadata) => void;
   onSort: (key: SortKey) => void;
 }
 
 export function PlansTable({
   plans,
-  selectedPlan,
+  selectedFilename,
   searchQuery,
   sortKey,
   sortDir,
@@ -82,7 +82,7 @@ export function PlansTable({
             <PlanRow
               key={plan.filename}
               plan={plan}
-              selected={selectedPlan?.filename === plan.filename}
+              selected={selectedFilename === plan.filename}
               searchQuery={searchQuery}
               onSelect={onSelectPlan}
             />

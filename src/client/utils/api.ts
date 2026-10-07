@@ -1,23 +1,3 @@
-import type { Plan, PlanMetadata } from "../types.ts";
-
-export async function fetchPlans(
-  signal?: AbortSignal,
-): Promise<PlanMetadata[]> {
-  const url = new URL("/api/plans", window.location.origin);
-  const res = await fetch(url.toString(), { signal });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch plans: ${res.statusText}`);
-  }
-  const data = await res.json();
-  return data.plans;
-}
-
-export async function fetchProjects(): Promise<string[]> {
-  const res = await fetch("/api/projects");
-  const data = await res.json();
-  return data.projects;
-}
-
 export async function fetchPlanContent(filename: string): Promise<string> {
   const res = await fetch(`/api/plans/${encodeURIComponent(filename)}/content`);
   if (!res.ok) {
@@ -25,6 +5,16 @@ export async function fetchPlanContent(filename: string): Promise<string> {
   }
   const data = await res.json();
   return data.content;
+}
+
+// Filenames of plans whose content contains the query (server holds the content)
+export async function searchPlanContent(q: string): Promise<string[]> {
+  const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+  if (!res.ok) {
+    throw new Error(`Failed to search plans: ${res.statusText}`);
+  }
+  const data = await res.json();
+  return data.filenames;
 }
 
 export async function openInEditor(filepath: string): Promise<void> {

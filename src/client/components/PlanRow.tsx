@@ -1,12 +1,12 @@
-import type { Plan } from "../types.ts";
+import type { PlanMetadata } from "../types.ts";
 import { formatDate, formatSize } from "../utils/formatters.ts";
-import { highlightText } from "../utils/strings.ts";
+import { Highlight } from "./Highlight.tsx";
 
 interface PlanRowProps {
-  plan: Plan;
+  plan: PlanMetadata;
   selected: boolean;
   searchQuery: string;
-  onSelect: (plan: Plan) => void;
+  onSelect: (plan: PlanMetadata) => void;
 }
 
 export function PlanRow({
@@ -26,31 +26,20 @@ export function PlanRow({
           className="title-btn"
           data-filename={plan.filename}
           title={plan.title}
-          dangerouslySetInnerHTML={{
-            __html: searchQuery
-              ? highlightText(plan.title, searchQuery)
-              : plan.title,
-          }}
-        />
+        >
+          <Highlight text={plan.title} query={searchQuery} />
+        </button>
       </td>
       <td className="filename-cell">
-        <span
-          dangerouslySetInnerHTML={{
-            __html: searchQuery
-              ? highlightText(plan.filename, searchQuery)
-              : plan.filename,
-          }}
-        />
+        <span>
+          <Highlight text={plan.filename} query={searchQuery} />
+        </span>
       </td>
       <td className="project-cell">
         {plan.project ? (
-          <span
-            dangerouslySetInnerHTML={{
-              __html: searchQuery
-                ? highlightText(plan.project, searchQuery)
-                : plan.project,
-            }}
-          />
+          <span>
+            <Highlight text={plan.project} query={searchQuery} />
+          </span>
         ) : (
           "—"
         )}

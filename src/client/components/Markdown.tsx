@@ -13,14 +13,16 @@ export function Markdown({ content }: MarkdownProps) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({ inline, className, children, ...props }) {
+          // `node` is the hast node react-markdown passes; keep it off the DOM.
+          // react-markdown v9+ has no `inline` prop: fenced blocks with a
+          // language get a language-* class, inline code never does.
+          code({ node, className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || "");
-            return !inline && match ? (
+            return match ? (
               <SyntaxHighlighter
                 style={atomDark}
                 language={match[1]}
                 PreTag="div"
-                {...props}
               >
                 {String(children).replace(/\n$/, "")}
               </SyntaxHighlighter>
@@ -30,7 +32,7 @@ export function Markdown({ content }: MarkdownProps) {
               </code>
             );
           },
-          table({ children, ...props }) {
+          table({ node, children, ...props }) {
             return (
               <div className="markdown-table-wrapper">
                 <table {...props}>{children}</table>

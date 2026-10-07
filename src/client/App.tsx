@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import type { Plan } from "./types.ts";
+import type { Plan, PlanMetadata } from "./types.ts";
 import { usePlans } from "./hooks/usePlans.ts";
-import { useProjects } from "./hooks/useProjects.ts";
+import { usePlanContent } from "./hooks/usePlanContent.ts";
 import { useFilters } from "./hooks/useFilters.ts";
 import { useDebounce } from "./hooks/useDebounce.ts";
 import { useKeyboard } from "./hooks/useKeyboard.ts";
@@ -13,7 +13,11 @@ import { DetailOverlay } from "./components/DetailOverlay.tsx";
 import { HelpModal } from "./components/HelpModal.tsx";
 
 export function App() {
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  // Selection is a filename; metadata and content are derived from it so they
+  // always reflect the latest fetched data
+  const [selectedFilename, setSelectedFilename] = useState<string | null>(() =>
+    new URLSearchParams(window.location.search).get("plan"),
+  );
   const [showOverlay, setShowOverlay] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -30,54 +34,57 @@ export function App() {
     clearProjects,
   } = useFilters();
 
-  // Debounce search to avoid hitting API on every keystroke
+  // Debounce search to avoid filtering (and hitting /api/search) on every keystroke
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  // Convert Set to array for API
   const projectsArray = useMemo(
     () => Array.from(selectedProjects),
     [selectedProjects],
   );
 
-  // Fetch plans with server-side filtering
-  const { plans, loading, refreshing, refresh, ensureContent } = usePlans({
+  const { plans, projects, loading, error, refreshing, refresh } = usePlans({
     q: debouncedSearch,
     sort: sortKey,
     dir: sortDir,
     projects: projectsArray,
   });
 
-  // Fetch projects list
-  const { projects: allProjects } = useProjects();
-
-  // Load content when plan is selected
-  const handleSelectPlan = useCallback(
-    async (plan: Plan | null) => {
-      // Update URL query parameter
-      const url = new URL(window.location.href);
-      if (plan) {
-        url.searchParams.set("plan", plan.filename);
-      } else {
-        url.searchParams.delete("plan");
-      }
-      window.history.replaceState({}, "", url.toString());
-
-      if (plan) {
-        const withContent = await ensureContent(plan);
-        setSelectedPlan(withContent);
-      } else {
-        setSelectedPlan(null);
-      }
-    },
-    [ensureContent],
+  const selectedMeta = useMemo(
+    () => plans.find((p) => p.filename === selectedFilename) ?? null,
+    [plans, selectedFilename],
   );
+  const content = usePlanContent(selectedMeta);
+  const selectedPlan = useMemo<Plan | null>(
+    () => (selectedMeta ? { ...selectedMeta, content } : null),
+    [selectedMeta, content],
+  );
+
+  const handleSelectPlan = useCallback((plan: PlanMetadata) => {
+    setSelectedFilename(plan.filename);
+  }, []);
+
+  // Keep ?plan= in sync with the selection
+  useEffect(() => {
+    if (!selectedFilename) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("plan", selectedFilename);
+    window.history.replaceState(null, "", url);
+  }, [selectedFilename]);
+
+  // Select the first plan when nothing (or a filtered-out plan) is selected
+  useEffect(() => {
+    const first = plans[0];
+    if (first && !selectedMeta) {
+      setSelectedFilename(first.filename);
+    }
+  }, [plans, selectedMeta]);
 
   // Open in editor
   const handleOpenEditor = useCallback(async () => {
-    if (selectedPlan) {
-      await openInEditor(selectedPlan.filepath);
+    if (selectedMeta) {
+      await openInEditor(selectedMeta.filepath);
     }
-  }, [selectedPlan]);
+  }, [selectedMeta]);
 
   // Copy session ID
   const handleCopySession = useCallback((sessionId: string) => {
@@ -91,12 +98,17 @@ export function App() {
 
   // Copy plan content
   const handleCopyPlan = useCallback(() => {
-    if (selectedPlan?.content) {
-      navigator.clipboard.writeText(selectedPlan.content);
+    if (content) {
+      navigator.clipboard.writeText(content);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     }
-  }, [selectedPlan]);
+  }, [content]);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   // Clear search
   const handleClearSearch = useCallback(() => {
@@ -105,48 +117,21 @@ export function App() {
     searchEl?.blur();
   }, [setSearchQuery]);
 
+  const toggleHelp = useCallback(() => setShowHelp((prev) => !prev), []);
+  const toggleOverlay = useCallback(() => setShowOverlay((prev) => !prev), []);
+
   // Keyboard shortcuts
   useKeyboard({
     plans,
-    selectedPlan,
+    selectedFilename: selectedMeta?.filename ?? null,
+    overlayOpen: showOverlay,
+    helpOpen: showHelp,
     onSelectPlan: handleSelectPlan,
     onOpenEditor: handleOpenEditor,
-    onToggleHelp: () => setShowHelp((prev) => !prev),
-    onToggleOverlay: () => setShowOverlay((prev) => !prev),
+    onToggleHelp: toggleHelp,
+    onToggleOverlay: toggleOverlay,
     onClearSearch: handleClearSearch,
   });
-
-  // Select plan from URL or auto-select first plan
-  useEffect(() => {
-    if (plans.length === 0) return;
-
-    // Check URL for plan parameter
-    const url = new URL(window.location.href);
-    const planFromUrl = url.searchParams.get("plan");
-
-    if (planFromUrl) {
-      const matchingPlan = plans.find((p) => p.filename === planFromUrl);
-      if (matchingPlan && selectedPlan?.filename !== planFromUrl) {
-        handleSelectPlan(matchingPlan);
-        return;
-      }
-    }
-
-    // Fall back to selecting first plan if nothing selected
-    if (!selectedPlan) {
-      handleSelectPlan(plans[0]);
-    }
-  }, [plans, selectedPlan, handleSelectPlan]);
-
-  // Clear selection if selected plan is no longer in results
-  useEffect(() => {
-    if (
-      selectedPlan &&
-      !plans.find((p) => p.filename === selectedPlan.filename)
-    ) {
-      setSelectedPlan(null);
-    }
-  }, [plans, selectedPlan]);
 
   if (loading && plans.length === 0) {
     return (
@@ -164,7 +149,7 @@ export function App() {
         <Header
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          projects={allProjects}
+          projects={projects}
           selectedProjects={selectedProjects}
           onToggleProject={toggleProject}
           onClearProjects={clearProjects}
@@ -174,15 +159,17 @@ export function App() {
 
         {plans.length === 0 ? (
           <div className="empty-state">
-            {searchQuery || selectedProjects.size > 0
-              ? "No plans match your filters"
-              : "No plans found"}
+            {error
+              ? `Failed to load plans: ${error.message}`
+              : searchQuery || selectedProjects.size > 0
+                ? "No plans match your filters"
+                : "No plans found"}
           </div>
         ) : (
           <PlansTable
             plans={plans}
-            selectedPlan={selectedPlan}
-            searchQuery={searchQuery}
+            selectedFilename={selectedMeta?.filename ?? null}
+            searchQuery={debouncedSearch}
             sortKey={sortKey}
             sortDir={sortDir}
             onSelectPlan={handleSelectPlan}

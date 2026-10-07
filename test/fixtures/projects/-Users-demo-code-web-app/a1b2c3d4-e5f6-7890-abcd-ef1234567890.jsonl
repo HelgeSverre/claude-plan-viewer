@@ -1,0 +1,2 @@
+{"type":"user","cwd":"/Users/demo/code/web-app","sessionId":"a1b2c3d4-e5f6-7890-abcd-ef1234567890","message":{"role":"user","content":"Add authentication"}}
+{"type":"assistant","cwd":"/Users/demo/code/web-app","sessionId":"a1b2c3d4-e5f6-7890-abcd-ef1234567890","slug":"demo-feature-auth","message":{"role":"assistant","content":"Planning"}}

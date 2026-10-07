@@ -1,8 +1,16 @@
-import { test, expect, describe, beforeAll, afterAll, setDefaultTimeout } from "bun:test";
-import type { Server } from "bun";
+import {
+  test,
+  expect,
+  describe,
+  beforeAll,
+  afterAll,
+  setDefaultTimeout,
+} from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 
-// Server may need time to scan large ~/.claude/projects directories
-setDefaultTimeout(30000);
+setDefaultTimeout(15000);
 
 // ============================================================================
 // API Endpoint Tests
@@ -10,35 +18,48 @@ setDefaultTimeout(30000);
 
 const TEST_PORT = 3599;
 const BASE_URL = `http://localhost:${TEST_PORT}`;
+// Fixture .claude dir: 3 plans, one session log mapping demo-feature-auth to "web-app"
+const FIXTURES_DIR = join(import.meta.dir, "fixtures");
 
 let serverProcess: Bun.Subprocess | null = null;
 
-beforeAll(async () => {
-  // Start the server as a subprocess
-  serverProcess = Bun.spawn(["bun", "index.ts", "-p", String(TEST_PORT)], {
-    cwd: import.meta.dir + "/..",
+function startServer(port: number, claudeDir: string): Bun.Subprocess {
+  return Bun.spawn(["bun", "index.ts", "-p", String(port), "-c", claudeDir], {
+    cwd: join(import.meta.dir, ".."),
     stdout: "pipe",
     stderr: "pipe",
   });
+}
 
-  // Wait for server to be ready (may take time to scan large project dirs)
-  const maxWait = 30000;
+async function waitForServer(baseUrl: string): Promise<void> {
   const startTime = Date.now();
-  while (Date.now() - startTime < maxWait) {
+  while (Date.now() - startTime < 10000) {
     try {
-      const response = await fetch(`${BASE_URL}/api/projects`);
-      if (response.ok) break;
+      const response = await fetch(`${baseUrl}/api/plans`);
+      if (response.ok) return;
     } catch {
       // Server not ready yet
     }
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
-}, 30000);
+  throw new Error(`Server at ${baseUrl} did not start`);
+}
+
+async function openFile(filepath: unknown): Promise<Response> {
+  return fetch(`${BASE_URL}/api/open`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filepath }),
+  });
+}
+
+beforeAll(async () => {
+  serverProcess = startServer(TEST_PORT, FIXTURES_DIR);
+  await waitForServer(BASE_URL);
+});
 
 afterAll(() => {
-  if (serverProcess) {
-    serverProcess.kill();
-  }
+  serverProcess?.kill();
 });
 
 // ============================================================================
@@ -81,6 +102,32 @@ describe("GET /api/plans", () => {
     if (data.plans.length > 0) {
       const plan = data.plans[0];
       expect(plan).not.toHaveProperty("content");
+    }
+  });
+
+  test("maps plans to projects and sessions from session logs", async () => {
+    const response = await fetch(`${BASE_URL}/api/plans`);
+    const { plans } = await response.json();
+
+    expect(plans).toHaveLength(3);
+    const auth = plans.find(
+      (p: { filename: string }) => p.filename === "demo-feature-auth.md",
+    );
+    expect(auth.project).toBe("web-app");
+    expect(auth.sessionId).toBe("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+  });
+
+  test("returns an empty list when the plans directory does not exist", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "plan-viewer-empty-"));
+    const port = TEST_PORT + 1;
+    const server = startServer(port, emptyDir);
+    try {
+      await waitForServer(`http://localhost:${port}`);
+      const response = await fetch(`http://localhost:${port}/api/plans`);
+      expect(await response.json()).toEqual({ plans: [] });
+    } finally {
+      server.kill();
+      await rm(emptyDir, { recursive: true, force: true });
     }
   });
 
@@ -130,6 +177,24 @@ describe("GET /api/plans/{filename}/content", () => {
       // Markdown content typically starts with # heading
       expect(data.content).toMatch(/^#|^\s*#/m);
     }
+  });
+});
+
+// ============================================================================
+// GET /api/search
+// ============================================================================
+
+describe("GET /api/search", () => {
+  test("matches plan content not present in titles", async () => {
+    // "JWT" appears only in the body of demo-feature-auth.md
+    const response = await fetch(`${BASE_URL}/api/search?q=jwt`);
+    const data = await response.json();
+    expect(data.filenames).toEqual(["demo-feature-auth.md"]);
+  });
+
+  test("returns no matches for an empty query", async () => {
+    const response = await fetch(`${BASE_URL}/api/search?q=%20`);
+    expect(await response.json()).toEqual({ filenames: [] });
   });
 });
 
@@ -199,21 +264,28 @@ describe("POST /api/refresh", () => {
 
 describe("POST /api/open", () => {
   test("returns 400 for missing filepath", async () => {
+    expect((await openFile(undefined)).status).toBe(400);
+  });
+
+  test("returns 400 for a non-JSON body", async () => {
     const response = await fetch(`${BASE_URL}/api/open`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: "not json",
     });
     expect(response.status).toBe(400);
   });
 
   test("returns 400 for invalid filepath (outside plans dir)", async () => {
-    const response = await fetch(`${BASE_URL}/api/open`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filepath: "/etc/passwd" }),
-    });
-    expect(response.status).toBe(400);
+    expect((await openFile("/etc/passwd")).status).toBe(400);
+  });
+
+  test("returns 400 for paths that escape the plans dir", async () => {
+    const { plans } = await (await fetch(`${BASE_URL}/api/plans`)).json();
+    const plansDir = dirname(plans[0].filepath);
+
+    expect((await openFile(`${plansDir}/../../etc/passwd`)).status).toBe(400);
+    expect((await openFile(`${plansDir}-evil/x.md`)).status).toBe(400);
+    expect((await openFile(`${plansDir}/not-a-plan.md`)).status).toBe(400);
   });
 
   // Note: We don't test success case as it would open a file in the editor
@@ -249,6 +321,7 @@ describe("GET /api/openapi.json", () => {
     expect(data).toHaveProperty("paths");
     expect(data.paths).toHaveProperty("/api/plans");
     expect(data.paths).toHaveProperty("/api/plans/{filename}/content");
+    expect(data.paths).toHaveProperty("/api/search");
     expect(data.paths).toHaveProperty("/api/projects");
     expect(data.paths).toHaveProperty("/api/refresh");
     expect(data.paths).toHaveProperty("/api/open");

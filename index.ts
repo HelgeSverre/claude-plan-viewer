@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { readdir, stat, watch } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { createInterface } from "node:readline";
 import index from "./src/index.html";
@@ -13,14 +13,17 @@ import getPort, { portNumbers } from "get-port";
 // Resolved at startup based on --claude-dir flag or CLAUDE_DIR env var
 let PLANS_DIR: string;
 let PROJECTS_DIR: string;
+// Set by --from-file: plans are served from an exported JSON file instead of PLANS_DIR
+let PLANS_FILE: string | undefined;
 
 function resolveClaudeDir(cliArg?: string): string {
   return cliArg || process.env.CLAUDE_DIR || join(homedir(), ".claude");
 }
 
 function initializeDirectories(claudeDir: string): void {
-  PLANS_DIR = join(claudeDir, "plans");
-  PROJECTS_DIR = join(claudeDir, "projects");
+  // Absolute so plan filepaths are stable for /api/open comparisons
+  PLANS_DIR = resolve(claudeDir, "plans");
+  PROJECTS_DIR = resolve(claudeDir, "projects");
 }
 
 interface CliArgs {
@@ -108,7 +111,7 @@ Examples:
 }
 
 async function exportPlansAsJson(outputPath?: string): Promise<void> {
-  const plans = await loadPlans();
+  const plans = await getPlans();
 
   const plansWithContent = plans.map((plan) => ({
     ...plan,
@@ -125,20 +128,13 @@ async function exportPlansAsJson(outputPath?: string): Promise<void> {
   }
 }
 
-async function loadPlansFromFile(filepath: string): Promise<PlanMetadata[]> {
-  const file = Bun.file(filepath);
-  const exists = await file.exists();
-
-  if (!exists) {
-    console.error(`File not found: ${filepath}`);
-    process.exit(1);
-  }
-
-  const data = await file.json();
+async function loadPlansFromFile(filepath: string): Promise<LoadedPlans> {
+  const data = await Bun.file(filepath).json();
   const plans: PlanMetadata[] = [];
+  const contents = new Map<string, string>();
 
   for (const plan of data) {
-    contentCache.set(plan.filename, plan.content || "");
+    contents.set(plan.filename, plan.content || "");
     plans.push({
       filename: plan.filename,
       filepath: plan.filepath,
@@ -153,8 +149,7 @@ async function loadPlansFromFile(filepath: string): Promise<PlanMetadata[]> {
     });
   }
 
-  cachedPlans = plans;
-  return plans;
+  return { plans, contents };
 }
 
 // Find an available port starting from the requested port
@@ -206,7 +201,7 @@ function extractProjectName(cwd: string): string {
 // Stream a JSONL file line-by-line without loading the entire file into memory
 async function processJsonlLineByLine(
   path: string,
-  onLine: (line: string) => void
+  onLine: (line: string) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const stream = createReadStream(path, {
@@ -231,160 +226,184 @@ interface SlugMetadata {
   sessionId: string | null;
 }
 
-interface ProjectMapping {
-  [slug: string]: SlugMetadata;
-}
+// Accumulated across incremental scans of ~/.claude/projects session logs
+const projectMapping = new Map<string, SlugMetadata>(); // plan slug -> project/session
+const dirProjectNames = new Map<string, string>(); // project dir -> name from first cwd seen
+const scannedJsonl = new Map<string, number>(); // JSONL path -> mtimeMs when scanned
+let lastProjectScan = 0;
 
-// Build a mapping of plan slugs to project names and session IDs by scanning Claude Code's project metadata.
-// Streams JSONL files line-by-line to avoid loading multi-GB project data into memory.
-// Only tracks slugs that correspond to actual plan files.
-async function buildProjectMapping(
-  neededSlugs?: Set<string>
-): Promise<ProjectMapping> {
-  const mapping: ProjectMapping = {};
+// Stream one session log, recording its project name and slug -> sessionId pairs.
+async function scanJsonl(dir: string, filePath: string): Promise<void> {
+  const slugSessions = new Map<string, string>();
 
-  try {
-    const projectDirs = await readdir(PROJECTS_DIR);
-
-    for (const dir of projectDirs) {
-      const dirPath = join(PROJECTS_DIR, dir);
-      try {
-        const dirStats = await stat(dirPath);
-        if (!dirStats.isDirectory()) continue;
-
-        const files = await readdir(dirPath);
-        const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
-        if (jsonlFiles.length === 0) continue;
-
-        let projectName: string | null = null;
-        const slugSessionMap = new Map<string, string>();
-
-        // Process files sequentially to keep memory bounded
-        for (const file of jsonlFiles) {
-          try {
-            await processJsonlLineByLine(join(dirPath, file), (line) => {
-              // Extract project name from cwd (only need first occurrence)
-              if (!projectName) {
-                const cwdMatch = line.match(/"cwd":"([^"]+)"/);
-                if (cwdMatch?.[1]) {
-                  const cwd = cwdMatch[1].replace(/\\\\/g, "\\");
-                  projectName = extractProjectName(cwd);
-                }
-              }
-
-              // Extract slug-sessionId pairs, filtering to only needed slugs
-              const slugMatch = line.match(/"slug":"([\w-]+)"/);
-              if (
-                slugMatch?.[1] &&
-                (!neededSlugs || neededSlugs.has(slugMatch[1]))
-              ) {
-                const sessionMatch = line.match(/"sessionId":"([^"]+)"/);
-                if (sessionMatch?.[1]) {
-                  slugSessionMap.set(slugMatch[1], sessionMatch[1]);
-                }
-              }
-            });
-          } catch {
-            // Skip unreadable files
-          }
-        }
-
-        if (projectName) {
-          for (const [slug, sessionId] of slugSessionMap) {
-            mapping[slug] = { project: projectName, sessionId };
-          }
-        }
-      } catch {
-        // Skip inaccessible directories
+  await processJsonlLineByLine(filePath, (line) => {
+    if (!dirProjectNames.has(dir)) {
+      const cwdMatch = line.match(/"cwd":"([^"]+)"/);
+      if (cwdMatch?.[1]) {
+        const cwd = cwdMatch[1].replace(/\\\\/g, "\\");
+        dirProjectNames.set(dir, extractProjectName(cwd));
       }
     }
+
+    const slugMatch = line.match(/"slug":"([\w-]+)"/);
+    if (slugMatch?.[1]) {
+      const sessionMatch = line.match(/"sessionId":"([^"]+)"/);
+      if (sessionMatch?.[1]) {
+        slugSessions.set(slugMatch[1], sessionMatch[1]);
+      }
+    }
+  });
+
+  const project = dirProjectNames.get(dir);
+  if (!project) return;
+  for (const [slug, sessionId] of slugSessions) {
+    projectMapping.set(slug, { project, sessionId });
+  }
+}
+
+// Map plan slugs to projects by scanning Claude Code's session logs.
+// Incremental: JSONL files unchanged since the previous scan are skipped, so a
+// rescan costs one stat per file plus re-reading only the logs that grew.
+// Files are streamed line-by-line to keep memory bounded on multi-GB data.
+async function scanProjects(): Promise<void> {
+  lastProjectScan = Date.now();
+
+  let projectDirs: string[];
+  try {
+    projectDirs = await readdir(PROJECTS_DIR);
   } catch {
-    // Projects dir may not exist, return empty mapping
+    return; // Projects dir may not exist
   }
 
-  return mapping;
+  for (const dir of projectDirs) {
+    let files: string[];
+    try {
+      files = await readdir(join(PROJECTS_DIR, dir));
+    } catch {
+      continue; // Not a directory, or inaccessible
+    }
+
+    // Sequential to keep memory bounded
+    for (const file of files) {
+      if (!file.endsWith(".jsonl")) continue;
+      const filePath = join(PROJECTS_DIR, dir, file);
+      try {
+        const { mtimeMs } = await stat(filePath);
+        if (scannedJsonl.get(filePath) === mtimeMs) continue;
+        await scanJsonl(dir, filePath);
+        scannedJsonl.set(filePath, mtimeMs);
+      } catch {
+        // Skip unreadable files
+      }
+    }
+  }
+}
+
+interface LoadedPlans {
+  plans: PlanMetadata[];
+  contents: Map<string, string>;
 }
 
 let cachedPlans: PlanMetadata[] | null = null;
-let cachedProjectMapping: ProjectMapping | null = null;
-const contentCache = new Map<string, string>();
+let contentCache = new Map<string, string>();
+let plansGeneration = 0;
+let plansLoad: Promise<PlanMetadata[]> | null = null;
 
-async function loadPlans(): Promise<PlanMetadata[]> {
-  const files = await readdir(PLANS_DIR);
-  const mdFiles = files.filter((f) => f.endsWith(".md"));
-
-  // Build or use cached project mapping, passing needed slugs for targeted lookup
-  let projectMapping: ProjectMapping;
-  if (!cachedProjectMapping) {
-    const neededSlugs = new Set(mdFiles.map((f) => f.replace(".md", "")));
-    projectMapping = await buildProjectMapping(neededSlugs);
-    cachedProjectMapping = projectMapping;
-  } else {
-    projectMapping = cachedProjectMapping;
+async function loadPlans(): Promise<LoadedPlans> {
+  let filenames: string[];
+  try {
+    filenames = (await readdir(PLANS_DIR)).filter((f) => f.endsWith(".md"));
+  } catch (err) {
+    // No plans directory yet (fresh install): serve an empty list
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return { plans: [], contents: new Map() };
+    }
+    throw err;
   }
 
-  const plans = await Promise.all(
-    mdFiles.map(async (filename) => {
-      const filepath = join(PLANS_DIR, filename);
-      const file = Bun.file(filepath);
+  const files = (
+    await Promise.all(
+      filenames.map(async (filename) => {
+        const filepath = join(PLANS_DIR, filename);
+        try {
+          const [content, stats] = await Promise.all([
+            Bun.file(filepath).text(),
+            stat(filepath),
+          ]);
+          return { filename, filepath, content, stats };
+        } catch {
+          return null; // Deleted between readdir and read
+        }
+      }),
+    )
+  ).filter((f) => f !== null);
 
-      const [content, stats] = await Promise.all([
-        file.text(),
-        stat(filepath),
-      ]);
-
-      const titleMatch = content.match(/^#\s+(.+)$/m);
-      const title = titleMatch?.[1]
-        ? titleMatch[1].replace(/^Plan:\s*/i, "")
-        : filename.replace(".md", "");
-
-      const slug = filename.replace(".md", "");
-      const lineCount = content.split("\n").length;
-      const wordCount = content.split(/\s+/).filter(Boolean).length;
-
-      const metadata = projectMapping[slug];
-      contentCache.set(filename, content);
-
-      return {
-        filename,
-        filepath,
-        title,
-        size: stats.size,
-        modified: stats.mtime.toISOString(),
-        created: stats.birthtime.toISOString(),
-        lineCount,
-        wordCount,
-        project: metadata?.project || null,
-        sessionId: metadata?.sessionId || null,
-      };
-    }),
+  // Rescan session logs when a plan is unmapped and newer than the last scan.
+  // Plans that stay unmapped (e.g. their session log was deleted) stop
+  // triggering rescans once a scan has run after their last modification.
+  const needsScan = files.some(
+    (f) =>
+      !projectMapping.has(f.filename.replace(/\.md$/, "")) &&
+      f.stats.mtimeMs >= lastProjectScan,
   );
+  if (needsScan) {
+    await scanProjects();
+  }
 
-  cachedPlans = plans;
-  return plans;
+  const contents = new Map<string, string>();
+  const plans = files.map(({ filename, filepath, content, stats }) => {
+    const titleMatch = content.match(/^#\s+(.+)$/m);
+    const title = titleMatch?.[1]
+      ? titleMatch[1].replace(/^Plan:\s*/i, "")
+      : filename.replace(/\.md$/, "");
+
+    const metadata = projectMapping.get(filename.replace(/\.md$/, ""));
+    contents.set(filename, content);
+
+    return {
+      filename,
+      filepath,
+      title,
+      size: stats.size,
+      modified: stats.mtime.toISOString(),
+      created: stats.birthtime.toISOString(),
+      lineCount: content.split("\n").length,
+      wordCount: content.split(/\s+/).filter(Boolean).length,
+      project: metadata?.project || null,
+      sessionId: metadata?.sessionId || null,
+    };
+  });
+
+  return { plans, contents };
 }
 
-// Granular cache invalidation
+// Return cached plans, loading them once if needed. Concurrent callers share
+// one in-flight load; a load that finishes after an invalidation is returned
+// to its callers but not cached.
+function getPlans(): Promise<PlanMetadata[]> {
+  if (cachedPlans) return Promise.resolve(cachedPlans);
+  if (plansLoad) return plansLoad;
+
+  const generation = plansGeneration;
+  const load = (PLANS_FILE ? loadPlansFromFile(PLANS_FILE) : loadPlans())
+    .then(({ plans, contents }) => {
+      if (generation === plansGeneration) {
+        cachedPlans = plans;
+        contentCache = contents;
+      }
+      return plans;
+    })
+    .finally(() => {
+      if (plansLoad === load) plansLoad = null;
+    });
+  plansLoad = load;
+  return load;
+}
+
 function invalidatePlansCache() {
   cachedPlans = null;
-}
-
-function invalidateProjectMapping() {
-  cachedProjectMapping = null;
-}
-
-function invalidateContentCache(filename?: string) {
-  if (filename) {
-    contentCache.delete(filename);
-  } else {
-    contentCache.clear();
-  }
-}
-
-function invalidateAllCaches() {
-  invalidatePlansCache();
-  invalidateProjectMapping();
-  invalidateContentCache();
+  plansLoad = null;
+  plansGeneration++;
 }
 
 // Watch plans directory for changes and invalidate cache
@@ -393,10 +412,7 @@ async function watchPlansDirectory() {
     const watcher = watch(PLANS_DIR);
     for await (const event of watcher) {
       if (event.filename?.endsWith(".md")) {
-        // Only invalidate plans metadata and the specific file's content
-        // Project mapping rarely changes, keep it cached
         invalidatePlansCache();
-        invalidateContentCache(event.filename);
       }
     }
   } catch {
@@ -406,7 +422,6 @@ async function watchPlansDirectory() {
 
 // Main server startup
 async function startServer(port: number, host?: string) {
-
   const server = Bun.serve({
     port,
     hostname: host,
@@ -414,14 +429,13 @@ async function startServer(port: number, host?: string) {
       "/": index,
       "/api": () => Response.redirect("/api/", 301),
       "/api/": apiDocs,
-      "/api/openapi.json": () => Response.json(openapi),
+      "/api/openapi.json": () =>
+        Response.json({
+          ...openapi,
+          info: { ...openapi.info, version: pkg.version },
+        }),
       "/api/projects": async () => {
-        // Lazy load cache on first request
-        if (!cachedPlans) {
-          await loadPlans();
-        }
-
-        const plans = cachedPlans || [];
+        const plans = await getPlans();
         const projects = [
           ...new Set(plans.map((p) => p.project).filter(Boolean)),
         ] as string[];
@@ -429,40 +443,14 @@ async function startServer(port: number, host?: string) {
 
         return Response.json({ projects });
       },
-      "/api/plans": async (req) => {
-        // Lazy load cache on first request
-        if (!cachedPlans) {
-          await loadPlans();
-        }
-
-        const plans = cachedPlans || [];
-
-        // Strip content from response - will be fetched separately via /api/plans/{id}/content
-        const plansWithoutContent = plans.map((p) => ({
-          filename: p.filename,
-          filepath: p.filepath,
-          title: p.title,
-          size: p.size,
-          modified: p.modified,
-          created: p.created,
-          lineCount: p.lineCount,
-          wordCount: p.wordCount,
-          project: p.project,
-          sessionId: p.sessionId,
-        }));
-
-        return Response.json({
-          plans: plansWithoutContent,
-        });
+      "/api/plans": async () => {
+        // Metadata only - content is fetched separately via /api/plans/{filename}/content
+        const plans = await getPlans();
+        return Response.json({ plans });
       },
       "/api/plans/:filename/content": async (req) => {
-        // Lazy load cache on first request
-        if (!cachedPlans) {
-          await loadPlans();
-        }
-
-        const filename = req.params.filename as string;
-        const content = contentCache.get(filename);
+        await getPlans();
+        const content = contentCache.get(req.params.filename);
 
         if (content === undefined) {
           return new Response("Plan not found", { status: 404 });
@@ -470,24 +458,43 @@ async function startServer(port: number, host?: string) {
 
         return Response.json({ content });
       },
+      "/api/search": async (req) => {
+        // Full-text search over plan content, which the client doesn't hold
+        const q = new URL(req.url).searchParams.get("q")?.trim().toLowerCase();
+        if (!q) {
+          return Response.json({ filenames: [] });
+        }
+
+        const plans = await getPlans();
+        const filenames = plans
+          .filter((p) =>
+            (contentCache.get(p.filename) ?? "").toLowerCase().includes(q),
+          )
+          .map((p) => p.filename);
+
+        return Response.json({ filenames });
+      },
       "/api/refresh": {
         POST: async () => {
           const before = cachedPlans?.length ?? 0;
-          // Only invalidate plans and content; project mapping is expensive
-          // to rebuild (streams all JSONL files) and rarely changes
           invalidatePlansCache();
-          invalidateContentCache();
-          await loadPlans();
-          const after = cachedPlans?.length ?? 0;
-          return Response.json({ success: true, before, after });
+          const plans = await getPlans();
+          return Response.json({ success: true, before, after: plans.length });
         },
       },
       "/api/open": {
         POST: async (req) => {
-          const { filepath } = await req.json();
-          if (!filepath || !filepath.startsWith(PLANS_DIR)) {
+          const body = await req.json().catch(() => null);
+          const filepath =
+            typeof body?.filepath === "string" ? resolve(body.filepath) : null;
+
+          // Only open known plan files: `open`/`xdg-open` would happily launch
+          // apps or scripts, and the server may listen on 0.0.0.0
+          const plans = await getPlans();
+          if (!filepath || !plans.some((p) => p.filepath === filepath)) {
             return new Response("Invalid path", { status: 400 });
           }
+
           try {
             await openInEditor(filepath);
             return Response.json({ success: true });
@@ -532,47 +539,50 @@ function link(url: string, text?: string): string {
   const claudeDir = resolveClaudeDir(args.claudeDir);
   initializeDirectories(claudeDir);
 
+  if (args.fromFile) {
+    if (!(await Bun.file(args.fromFile).exists())) {
+      console.error(`File not found: ${args.fromFile}`);
+      process.exit(1);
+    }
+    PLANS_FILE = args.fromFile;
+  }
+
   if (args.json) {
     await exportPlansAsJson(args.output);
     process.exit(0);
   }
 
-  // Start server first
+  if (
+    args.port !== undefined &&
+    (!Number.isInteger(args.port) || args.port < 1 || args.port > 65535)
+  ) {
+    console.error("Invalid port: must be an integer between 1 and 65535");
+    process.exit(1);
+  }
+
+  // Start server first; early requests share the preload below
   const port = await findAvailablePort(args.port ?? 3000);
   const server = await startServer(port, args.host);
 
-  // Pre-load plans from file or directory
-  let planCount: number;
-  let projectCount = 0;
-  let sourceDisplay: string;
-
-  if (args.fromFile) {
-    const plans = await loadPlansFromFile(args.fromFile);
-    planCount = plans.length;
-    sourceDisplay = args.fromFile;
-  } else {
-    sourceDisplay = PLANS_DIR;
-    // Only watch for file changes when not using --from-file
+  // Only watch for file changes when serving from the plans directory
+  if (!PLANS_FILE) {
     watchPlansDirectory();
-
-    await loadPlans();
-
-    const projects = new Set(
-      (cachedPlans || []).map((p) => p.project).filter(Boolean)
-    );
-    projectCount = projects.size;
-    planCount = cachedPlans?.length ?? 0;
   }
+
+  const plans = await getPlans();
+  const planCount = plans.length;
+  const projectCount = new Set(plans.map((p) => p.project).filter(Boolean))
+    .size;
 
   const localUrl = `http://localhost:${server.port}/`;
   const apiUrl = `http://localhost:${server.port}/api/`;
-  const dirUrl = `file://${claudeDir}`;
+  const dirUrl = `file://${resolve(claudeDir)}`;
 
   console.log(`\nclaude-plan-viewer v${pkg.version}\n`);
   console.log(`  ➜  Web:    ${link(localUrl)}`);
   console.log(`  ➜  API:    ${link(apiUrl)}`);
-  if (args.fromFile) {
-    console.log(`  ➜  Source: ${sourceDisplay}`);
+  if (PLANS_FILE) {
+    console.log(`  ➜  Source: ${PLANS_FILE}`);
   } else {
     console.log(`  ➜  Dir:    ${link(dirUrl)} (${projectCount} projects)`);
   }

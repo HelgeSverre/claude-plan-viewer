@@ -1,7 +1,12 @@
+import type { View } from "../types.ts";
 import { SearchInput } from "./SearchInput.tsx";
 import { ProjectFilter } from "./ProjectFilter.tsx";
 
 interface HeaderProps {
+  view: View;
+  onViewChange: (view: View) => void;
+  planCount: number;
+  memoryCount: number;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   projects: string[];
@@ -13,6 +18,10 @@ interface HeaderProps {
 }
 
 export function Header({
+  view,
+  onViewChange,
+  planCount,
+  memoryCount,
   searchQuery,
   onSearchChange,
   projects,
@@ -36,8 +45,34 @@ export function Header({
           </svg>
           Claude Plan Viewer
         </h1>
+        <div className="view-switch" role="tablist" aria-label="View">
+          <button
+            role="tab"
+            aria-selected={view === "plans"}
+            className={view === "plans" ? "active" : ""}
+            onClick={() => onViewChange("plans")}
+            title="Plans (1)"
+          >
+            Plans <span className="view-count">{planCount}</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected={view === "memory"}
+            className={view === "memory" ? "active" : ""}
+            onClick={() => onViewChange("memory")}
+            title="Memory (2)"
+          >
+            Memory <span className="view-count">{memoryCount}</span>
+          </button>
+        </div>
         <div className="header-spacer" />
-        <SearchInput value={searchQuery} onChange={onSearchChange} />
+        <SearchInput
+          value={searchQuery}
+          placeholder={
+            view === "plans" ? "Search plans..." : "Search memory..."
+          }
+          onChange={onSearchChange}
+        />
         {projects.length > 0 && (
           <ProjectFilter
             projects={projects}
@@ -51,7 +86,7 @@ export function Header({
           id="refresh-btn"
           onClick={onRefresh}
           disabled={refreshing}
-          title="Refresh plans"
+          title="Refresh"
         >
           <svg
             className="icon"

@@ -16,10 +16,14 @@ export interface Plan extends PlanMetadata {
 }
 
 export type SortKey =
-  | "title"
-  | "project"
-  | "modified"
-  | "size"
-  | "lines"
-  | "created";
+  "title" | "project" | "modified" | "size" | "lines" | "created";
 export type SortDir = "asc" | "desc";
+
+export type {
+  MemoryEntry,
+  MemoryIndexStats,
+  MemorySource,
+  MemoryType,
+} from "../server/memory.ts";
+
+export type View = "plans" | "memory";

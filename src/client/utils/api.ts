@@ -35,3 +35,22 @@ export async function refreshCache(): Promise<RefreshResponse> {
   const res = await fetch("/api/refresh", { method: "POST" });
   return res.json();
 }
+
+export async function fetchMemoryContent(id: string): Promise<string> {
+  const res = await fetch(`/api/memory/content?id=${encodeURIComponent(id)}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch memory content: ${res.statusText}`);
+  }
+  const data = await res.json();
+  return data.content;
+}
+
+// Ids of memory entries whose content contains the query
+export async function searchMemoryContent(q: string): Promise<string[]> {
+  const res = await fetch(`/api/memory/search?q=${encodeURIComponent(q)}`);
+  if (!res.ok) {
+    throw new Error(`Failed to search memory: ${res.statusText}`);
+  }
+  const data = await res.json();
+  return data.ids;
+}

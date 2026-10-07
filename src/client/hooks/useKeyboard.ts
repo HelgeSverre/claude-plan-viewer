@@ -1,12 +1,15 @@
 import { useEffect, useCallback } from "react";
-import type { PlanMetadata } from "../types.ts";
+import type { View } from "../types.ts";
 
 interface UseKeyboardOptions {
-  plans: PlanMetadata[];
-  selectedFilename: string | null;
+  // Ids of the rows in the current view, in display order. Rows carry a
+  // matching data-row-id attribute so the selection can be scrolled into view.
+  itemIds: string[];
+  selectedId: string | null;
   overlayOpen: boolean;
   helpOpen: boolean;
-  onSelectPlan: (plan: PlanMetadata) => void;
+  onSelect: (id: string) => void;
+  onSwitchView: (view: View) => void;
   onOpenEditor: () => void;
   onToggleHelp: () => void;
   onToggleOverlay: () => void;
@@ -20,11 +23,12 @@ function isTextField(el: Element | null): boolean {
 // Global shortcuts. Cmd/Ctrl+K lives in SearchInput; the overlay and help
 // modal handle their own Escape/F/? keys, so those are skipped while open.
 export function useKeyboard({
-  plans,
-  selectedFilename,
+  itemIds,
+  selectedId,
   overlayOpen,
   helpOpen,
-  onSelectPlan,
+  onSelect,
+  onSwitchView,
   onOpenEditor,
   onToggleHelp,
   onToggleOverlay,
@@ -40,24 +44,25 @@ export function useKeyboard({
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         if (isTextField(activeEl) && activeEl?.id !== "search") return;
         e.preventDefault();
-        const idx = plans.findIndex((p) => p.filename === selectedFilename);
+        const idx = selectedId ? itemIds.indexOf(selectedId) : -1;
         let newIdx = e.key === "ArrowDown" ? idx + 1 : idx - 1;
         if (newIdx < 0) newIdx = 0;
-        if (newIdx >= plans.length) newIdx = plans.length - 1;
-        const plan = plans[newIdx];
-        if (plan) {
-          onSelectPlan(plan);
+        if (newIdx >= itemIds.length) newIdx = itemIds.length - 1;
+        const id = itemIds[newIdx];
+        if (id) {
+          onSelect(id);
           document
-            .querySelector(`tr[data-filename="${CSS.escape(plan.filename)}"]`)
+            .querySelector(`tr[data-row-id="${CSS.escape(id)}"]`)
             ?.scrollIntoView({ block: "nearest" });
         }
         return;
       }
 
       if (overlayOpen) return;
+      const plainKey = !e.metaKey && !e.ctrlKey && !e.altKey;
 
       // Enter: Open in editor
-      if (e.key === "Enter" && selectedFilename) {
+      if (e.key === "Enter" && selectedId) {
         if (!isTextField(activeEl) && activeEl?.tagName !== "BUTTON") {
           e.preventDefault();
           onOpenEditor();
@@ -71,36 +76,35 @@ export function useKeyboard({
         return;
       }
 
+      if (isTextField(activeEl)) return;
+
+      // 1 / 2: Switch between plans and memory
+      if ((e.key === "1" || e.key === "2") && plainKey) {
+        e.preventDefault();
+        onSwitchView(e.key === "1" ? "plans" : "memory");
+        return;
+      }
+
       // ?: Toggle help
       if (e.key === "?" && !e.metaKey && !e.ctrlKey) {
-        if (!isTextField(activeEl)) {
-          e.preventDefault();
-          onToggleHelp();
-        }
+        e.preventDefault();
+        onToggleHelp();
         return;
       }
 
       // F: Open fullscreen overlay
-      if (
-        e.key === "f" &&
-        selectedFilename &&
-        !e.metaKey &&
-        !e.ctrlKey &&
-        !e.altKey
-      ) {
-        if (!isTextField(activeEl)) {
-          e.preventDefault();
-          onToggleOverlay();
-        }
-        return;
+      if (e.key === "f" && selectedId && plainKey) {
+        e.preventDefault();
+        onToggleOverlay();
       }
     },
     [
-      plans,
-      selectedFilename,
+      itemIds,
+      selectedId,
       overlayOpen,
       helpOpen,
-      onSelectPlan,
+      onSelect,
+      onSwitchView,
       onOpenEditor,
       onToggleHelp,
       onToggleOverlay,

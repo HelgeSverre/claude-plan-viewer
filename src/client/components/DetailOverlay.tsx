@@ -1,24 +1,25 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useFocusTrap } from "../hooks/useFocusTrap";
-import type { Plan } from "../types.ts";
-import { formatFullDate, formatSize } from "../utils/formatters.ts";
-import { Markdown } from "./Markdown.tsx";
+import { CloseIcon, CopyIcon, EditIcon } from "./icons.tsx";
 
 interface DetailOverlayProps {
-  plan: Plan;
+  title: string;
+  // Metadata shown in the top bar
+  meta: ReactNode;
+  children: ReactNode;
   onClose: () => void;
   onOpenEditor: () => void;
-  onCopySession: (sessionId: string) => void;
-  onCopyPlan: () => void;
+  onCopy: () => void;
   copied: boolean;
 }
 
 export function DetailOverlay({
-  plan,
+  title,
+  meta,
+  children,
   onClose,
   onOpenEditor,
-  onCopySession,
-  onCopyPlan,
+  onCopy,
   copied,
 }: DetailOverlayProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -56,89 +57,34 @@ export function DetailOverlay({
         className="detail-overlay-panel"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="detail-overlay-title"
+        aria-label={title}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="detail-overlay-bar">
-          <div className="detail-meta detail-overlay-meta">
-            {plan.project && (
-              <span className="project-tag">{plan.project}</span>
-            )}
-            <span id="detail-overlay-title">{plan.filename}</span>
-            <span>{formatFullDate(plan.modified)}</span>
-            <span>{formatSize(plan.size)}</span>
-            <span>{plan.lineCount} lines</span>
-            {plan.sessionId && (
-              <button
-                className="session-tag"
-                onClick={() => onCopySession(plan.sessionId!)}
-                title={`Click to copy: claude --resume ${plan.sessionId}`}
-              >
-                {plan.sessionId.split("-")[0]}
-              </button>
-            )}
-          </div>
+          <div className="detail-meta detail-overlay-meta">{meta}</div>
           <button
             className={copied ? "action-btn copied" : "action-btn"}
-            onClick={onCopyPlan}
-            title="Copy plan to clipboard"
+            onClick={onCopy}
+            title="Copy to clipboard"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="icon"
-            >
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
+            <CopyIcon />
           </button>
           <button
             className="action-btn"
             onClick={onOpenEditor}
             title="Open in editor (Enter)"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="icon"
-            >
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
+            <EditIcon />
           </button>
           <button
             className="modal-close"
             onClick={onClose}
             title="Close fullscreen (Esc or F)"
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            <CloseIcon />
           </button>
         </div>
-        <div className="detail-overlay-content">
-          <Markdown content={plan.content || ""} />
-        </div>
+        <div className="detail-overlay-content">{children}</div>
       </div>
     </div>
   );

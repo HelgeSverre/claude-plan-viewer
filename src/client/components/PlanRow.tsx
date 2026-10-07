@@ -19,6 +19,7 @@ export function PlanRow({
     <tr
       className={selected ? "selected" : ""}
       data-filename={plan.filename}
+      data-row-id={plan.filename}
       onMouseDown={() => onSelect(plan)}
     >
       <td className="title-cell">

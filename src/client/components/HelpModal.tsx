@@ -6,7 +6,8 @@ interface HelpModalProps {
 }
 
 const SHORTCUTS = [
-  { keys: "↑ / ↓", description: "Navigate plans" },
+  { keys: "1 / 2", description: "Show plans / memory" },
+  { keys: "↑ / ↓", description: "Navigate the list" },
   { keys: "Enter", description: "Open in editor" },
   { keys: "F", description: "Toggle fullscreen" },
   { keys: "⌘K", description: "Focus search" },

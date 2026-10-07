@@ -2,10 +2,15 @@ import { useRef, useEffect } from "react";
 
 interface SearchInputProps {
   value: string;
+  placeholder: string;
   onChange: (value: string) => void;
 }
 
-export function SearchInput({ value, onChange }: SearchInputProps) {
+export function SearchInput({
+  value,
+  placeholder,
+  onChange,
+}: SearchInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -38,7 +43,7 @@ export function SearchInput({ value, onChange }: SearchInputProps) {
         type="text"
         id="search"
         className="search-input"
-        placeholder="Search plans..."
+        placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />

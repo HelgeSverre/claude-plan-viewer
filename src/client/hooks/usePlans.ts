@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
-import useSWR, { useSWRConfig, type SWRConfiguration } from "swr";
+import { useMemo } from "react";
+import useSWR, { type SWRConfiguration } from "swr";
 import type { SortKey, SortDir, PlanMetadata } from "../types.ts";
-import { refreshCache, searchPlanContent } from "../utils/api.ts";
+import { searchPlanContent } from "../utils/api.ts";
 
 export interface UsePlansParams {
   q?: string;
@@ -11,15 +11,14 @@ export interface UsePlansParams {
 }
 
 interface UsePlansReturn {
+  // Filtered and sorted
   plans: PlanMetadata[];
+  allPlans: PlanMetadata[];
   projects: string[];
   loading: boolean;
   error: Error | undefined;
-  refreshing: boolean;
-  refresh: () => Promise<void>;
 }
 
-const SEARCH_KEY = "/api/search";
 const EMPTY: PlanMetadata[] = [];
 
 export const swrOptions: SWRConfiguration = {
@@ -43,14 +42,10 @@ const plansFetcher = async (url: string): Promise<PlanMetadata[]> => {
 };
 
 export function usePlans(params: UsePlansParams = {}): UsePlansReturn {
-  const [refreshing, setRefreshing] = useState(false);
-  const { mutate: globalMutate } = useSWRConfig();
-
   const {
     data: allPlans = EMPTY,
     error,
     isLoading: loading,
-    mutate,
   } = useSWR<PlanMetadata[]>("/api/plans", plansFetcher, swrOptions);
 
   const q = params.q?.trim() ?? "";
@@ -58,7 +53,7 @@ export function usePlans(params: UsePlansParams = {}): UsePlansReturn {
   // Content lives on the server; it returns which plans' content matches.
   // Previous matches are kept while the next query loads to avoid flicker.
   const { data: contentMatches } = useSWR(
-    q ? [SEARCH_KEY, q] : null,
+    q ? ["/api/search", q] : null,
     ([, query]: [string, string]) => searchPlanContent(query),
     { ...swrOptions, keepPreviousData: true },
   );
@@ -70,19 +65,6 @@ export function usePlans(params: UsePlansParams = {}): UsePlansReturn {
     }
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [allPlans]);
-
-  const refresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await refreshCache();
-      await Promise.all([
-        mutate(),
-        globalMutate((key) => Array.isArray(key) && key[0] === SEARCH_KEY),
-      ]);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [mutate, globalMutate]);
 
   // Client-side filtering
   const filteredPlans = useMemo(() => {
@@ -149,10 +131,9 @@ export function usePlans(params: UsePlansParams = {}): UsePlansReturn {
 
   return {
     plans: sortedPlans,
+    allPlans,
     projects,
     loading,
     error,
-    refreshing,
-    refresh,
   };
 }

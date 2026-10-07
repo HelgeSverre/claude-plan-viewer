@@ -26,15 +26,20 @@ interface UseFiltersReturn {
   setSort: (key: SortKey, dir?: SortDir) => void;
   selectedProjects: Set<string>;
   toggleProject: (project: string) => void;
+  setProjects: (projects: string[]) => void;
   clearProjects: () => void;
+  selectedTypes: Set<string>;
+  toggleType: (type: string) => void;
+  clearTypes: () => void;
 }
 
 function isSortKey(value: string | null): value is SortKey {
   return value !== null && value in SORT_DEFAULTS;
 }
 
-// Filters persist in the URL (?q=…&sort=…&dir=…&project=…) so views can be
-// bookmarked and survive reloads.
+// Filters persist in the URL (?q=…&sort=…&dir=…&project=…&type=…) so views
+// can be bookmarked and survive reloads. Search and projects apply to both
+// views; type filters only apply to memory.
 function readFiltersFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const sortParam = params.get("sort");
@@ -47,6 +52,7 @@ function readFiltersFromUrl() {
     searchQuery: params.get("q") ?? "",
     sort: { key, dir } as SortState,
     projects: new Set(params.getAll("project")),
+    types: new Set(params.getAll("type")),
   };
 }
 
@@ -56,6 +62,9 @@ export function useFilters(): UseFiltersReturn {
   const [sort, setSortState] = useState<SortState>(initial.sort);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(
     initial.projects,
+  );
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(
+    initial.types,
   );
 
   // Debounced: Safari throttles history.replaceState calls
@@ -82,11 +91,16 @@ export function useFilters(): UseFiltersReturn {
         params.append("project", project);
       }
 
+      params.delete("type");
+      for (const type of selectedTypes) {
+        params.append("type", type);
+      }
+
       window.history.replaceState(null, "", url);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, sort, selectedProjects]);
+  }, [searchQuery, sort, selectedProjects, selectedTypes]);
 
   const setSort = useCallback((key: SortKey, dir?: SortDir) => {
     setSortState((prev) => {
@@ -100,19 +114,23 @@ export function useFilters(): UseFiltersReturn {
   }, []);
 
   const toggleProject = useCallback((project: string) => {
-    setSelectedProjects((prev) => {
-      const next = new Set(prev);
-      if (next.has(project)) {
-        next.delete(project);
-      } else {
-        next.add(project);
-      }
-      return next;
-    });
+    setSelectedProjects((prev) => toggled(prev, project));
+  }, []);
+
+  const setProjects = useCallback((projects: string[]) => {
+    setSelectedProjects(new Set(projects));
   }, []);
 
   const clearProjects = useCallback(() => {
     setSelectedProjects(new Set());
+  }, []);
+
+  const toggleType = useCallback((type: string) => {
+    setSelectedTypes((prev) => toggled(prev, type));
+  }, []);
+
+  const clearTypes = useCallback(() => {
+    setSelectedTypes(new Set());
   }, []);
 
   return {
@@ -123,6 +141,20 @@ export function useFilters(): UseFiltersReturn {
     setSort,
     selectedProjects,
     toggleProject,
+    setProjects,
     clearProjects,
+    selectedTypes,
+    toggleType,
+    clearTypes,
   };
+}
+
+function toggled(set: Set<string>, value: string): Set<string> {
+  const next = new Set(set);
+  if (next.has(value)) {
+    next.delete(value);
+  } else {
+    next.add(value);
+  }
+  return next;
 }

@@ -53,7 +53,7 @@
   },
   "homepage": "https://claudeplans.dev",
   "engines": {
-    "bun": ">=1.0.0"
+    "bun": ">=1.2.21"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.6.0",

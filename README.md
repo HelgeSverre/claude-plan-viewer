@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Bun](https://img.shields.io/badge/Bun-%23000000.svg?logo=bun&logoColor=white)](https://bun.sh)
 
-**[📖 Documentation](https://claudeplans.dev)** | **[🚀 Quick Start](https://claudeplans.dev/getting-started/quickstart)** | **[📚 API Reference](https://claudeplans.dev/reference/api)**
+**[📖 Documentation](https://claudeplans.dev)** | **[🚀 Quick Start](https://claudeplans.dev/introduction/quickstart)** | **[📚 API Reference](https://claudeplans.dev/reference/api)**
 
 ![screenshot](screenshot.png)
 

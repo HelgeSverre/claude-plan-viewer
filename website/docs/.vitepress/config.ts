@@ -10,6 +10,9 @@ export default defineConfig({
 
   lastUpdated: true,
 
+  // Links without .html; Vercel serves them via cleanUrls in website/vercel.json
+  cleanUrls: true,
+
   ignoreDeadLinks: [/^http:\/\/localhost/],
 
   head: [

@@ -9,6 +9,7 @@ import {
   decodeProjectDirName,
   projectNameFromDirName,
   readCwdFromSessionLogs,
+  readAutoMemoryDirectory,
   scanMemory,
   type MemorySnapshot,
 } from "../src/server/memory.ts";
@@ -44,6 +45,24 @@ describe("parseFrontmatter", () => {
       metadata: { type: "project", originSessionId: "s9" },
     });
     expect(body).toBe("Body");
+  });
+
+  test("keeps unquoted values containing ' #' and non-string scalars", () => {
+    // Strict YAML would cut this at "#" and read name as a number
+    const { data } = parseFrontmatter(
+      "---\nname: 123\ndescription: Shipped (ADR #66); measured wins\n---\n",
+    );
+    expect(data).toEqual({
+      name: "123",
+      description: "Shipped (ADR #66); measured wins",
+    });
+  });
+
+  test("uses YAML for block scalars", () => {
+    const { data } = parseFrontmatter(
+      "---\nname: x\ndescription: >\n  folded\n  text\n---\n",
+    );
+    expect(data).toEqual({ name: "x", description: "folded text\n" });
   });
 
   test("handles CRLF line endings", () => {
@@ -82,49 +101,78 @@ describe("countLines", () => {
 });
 
 describe("decodeProjectDirName", () => {
-  const dirs = new Set([
-    "/Users",
-    "/Users/demo",
-    "/Users/demo/code",
-    "/Users/demo/code/my-app",
-    "/Users/demo/.config",
-    "/Users/demo/.config/tool",
-    "/Users/demo/code/crescat",
-    "/Users/demo/code/crescat/.git",
-  ]);
-  const exists = (p: string) => dirs.has(p);
+  const tree: Record<string, string[]> = {
+    "/": ["Users"],
+    "/Users": ["demo"],
+    "/Users/demo": ["code", ".config"],
+    "/Users/demo/code": ["my-app", "my_lib", "crescat"],
+    "/Users/demo/.config": ["tool"],
+    "/Users/demo/code/crescat": [".git", "src"],
+  };
+  const listDir = (p: string) => tree[p] ?? [];
 
   test("rebuilds paths whose names contain dashes", () => {
-    expect(decodeProjectDirName("-Users-demo-code-my-app", exists)).toBe(
+    expect(decodeProjectDirName("-Users-demo-code-my-app", listDir)).toBe(
       "/Users/demo/code/my-app",
     );
   });
 
   test("rebuilds dot-prefixed directories", () => {
-    expect(decodeProjectDirName("-Users-demo--config-tool", exists)).toBe(
+    expect(decodeProjectDirName("-Users-demo--config-tool", listDir)).toBe(
       "/Users/demo/.config/tool",
     );
   });
 
+  test("rebuilds names with other characters Claude Code replaces", () => {
+    expect(decodeProjectDirName("-Users-demo-code-my-lib", listDir)).toBe(
+      "/Users/demo/code/my_lib",
+    );
+  });
+
   test("names deleted projects after the part of the path that's gone", () => {
-    expect(projectNameFromDirName("-Users-demo-code-my-app", exists)).toBe(
+    expect(projectNameFromDirName("-Users-demo-code-my-app", listDir)).toBe(
       "my-app",
     );
-    expect(projectNameFromDirName("-Users-demo-code-gone-app", exists)).toBe(
+    expect(projectNameFromDirName("-Users-demo-code-gone-app", listDir)).toBe(
       "gone-app",
     );
     // Not "ingest": a deleted project can't be nested inside another repo
     expect(
-      projectNameFromDirName("-Users-demo-code-crescat-ingest", exists),
+      projectNameFromDirName("-Users-demo-code-crescat-ingest", listDir),
     ).toBe("crescat-ingest");
-    expect(projectNameFromDirName("C--Users-demo", exists)).toBe(
+    expect(projectNameFromDirName("C--Users-demo", listDir)).toBe(
       "C--Users-demo",
     );
   });
 
   test("returns null when the path no longer exists", () => {
-    expect(decodeProjectDirName("-Users-demo-code-gone", exists)).toBeNull();
-    expect(decodeProjectDirName("C--Users-demo", exists)).toBeNull();
+    expect(decodeProjectDirName("-Users-demo-code-gone", listDir)).toBeNull();
+    expect(decodeProjectDirName("C--Users-demo", listDir)).toBeNull();
+  });
+});
+
+describe("readAutoMemoryDirectory", () => {
+  test("only reads small regular settings files", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "plan-viewer-settings-"));
+    try {
+      const valid = join(dir, "valid.json");
+      await writeFile(valid, JSON.stringify({ autoMemoryDirectory: "/mem" }));
+      expect(await readAutoMemoryDirectory(valid)).toBe("/mem");
+
+      const relative = join(dir, "relative.json");
+      await writeFile(relative, JSON.stringify({ autoMemoryDirectory: "mem" }));
+      expect(await readAutoMemoryDirectory(relative)).toBeNull();
+
+      const notAFile = join(dir, "settings.json");
+      await mkdir(notAFile);
+      expect(await readAutoMemoryDirectory(notAFile)).toBeNull();
+
+      const huge = join(dir, "huge.json");
+      await writeFile(huge, " ".repeat(2 * 1024 * 1024) + "{}");
+      expect(await readAutoMemoryDirectory(huge)).toBeNull();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

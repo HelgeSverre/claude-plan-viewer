@@ -1,4 +1,4 @@
-import Select, { type MultiValue } from "react-select";
+import Select, { type ActionMeta, type MultiValue } from "react-select";
 
 interface ProjectFilterProps {
   projects: string[];
@@ -13,18 +13,30 @@ export function ProjectFilter({
   onToggle,
   onClear,
 }: ProjectFilterProps) {
-  const options = projects.map((p) => ({ value: p, label: p }));
+  // The selection is shared by the Plans and Memory views, so it can hold
+  // projects the current view doesn't list. Show them too so they can be
+  // deselected or cleared from either view.
+  const allProjects = [
+    ...projects,
+    ...[...selectedProjects].filter((p) => !projects.includes(p)),
+  ];
+  const options = allProjects.map((p) => ({ value: p, label: p }));
 
-  const selectedOptions = projects
+  const selectedOptions = allProjects
     .filter((p) => selectedProjects.has(p))
     .map((p) => ({ value: p, label: p }));
 
   const handleChange = (
     newValue: MultiValue<{ value: string; label: string }> | null,
+    meta: ActionMeta<{ value: string; label: string }>,
   ) => {
-    const selectedSet = new Set((newValue ?? []).map((option) => option.value));
+    if (meta.action === "clear") {
+      onClear();
+      return;
+    }
 
-    projects.forEach((project) => {
+    const selectedSet = new Set((newValue ?? []).map((option) => option.value));
+    allProjects.forEach((project) => {
       const isSelected = selectedSet.has(project);
       const wasSelected = selectedProjects.has(project);
       if (isSelected !== wasSelected) {

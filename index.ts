@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { readdir, stat, watch } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { createInterface } from "node:readline";
 import index from "./src/index.html";
@@ -10,6 +10,7 @@ import pkg from "./package.json";
 import openapi from "./openapi.json";
 import getPort, { portNumbers } from "get-port";
 import {
+  decodeProjectDirName,
   readCwdFromSessionLogs,
   scanMemory,
   type MemorySnapshot,
@@ -97,7 +98,7 @@ Usage: claude-plan-viewer [options]
 
 Options:
   -p, --port <number>       Port to start server on (default: 3000)
-  -H, --host <address>      Host to bind to (default: localhost)
+  -H, --host <address>      Host to bind to (default: 127.0.0.1)
                             Use 0.0.0.0 to listen on all interfaces
   -c, --claude-dir <path>   Path to .claude directory (default: ~/.claude)
                             Can also be set via CLAUDE_DIR environment variable
@@ -414,28 +415,38 @@ function invalidatePlansCache() {
   plansGeneration++;
 }
 
-// Project dir path -> working directory from its session logs (null: none found)
+// Project dir path -> working directory from its session logs, or decoded
+// from the dir name when the logs are gone (null: neither worked)
 const dirCwds = new Map<string, string | null>();
 
 async function resolveProjectCwd(projectDir: string): Promise<string | null> {
   if (!dirCwds.has(projectDir)) {
-    dirCwds.set(projectDir, await readCwdFromSessionLogs(projectDir));
+    const cwd =
+      (await readCwdFromSessionLogs(projectDir)) ??
+      decodeProjectDirName(basename(projectDir));
+    dirCwds.set(projectDir, cwd);
   }
   return dirCwds.get(projectDir) ?? null;
 }
 
 // Memory dirs are small but spread over every project dir, so a scan costs
-// ~50-200ms. Cache briefly instead of watching hundreds of directories.
+// ~50-200ms. Cache briefly instead of watching hundreds of directories; a
+// stale snapshot is served while the next scan runs in the background.
 const MEMORY_TTL_MS = 5000;
 let memoryCache: { snapshot: MemorySnapshot; loadedAt: number } | null = null;
 let memoryLoad: Promise<MemorySnapshot> | null = null;
 
 function getMemory(): Promise<MemorySnapshot> {
-  if (memoryCache && Date.now() - memoryCache.loadedAt < MEMORY_TTL_MS) {
+  if (memoryCache) {
+    if (Date.now() - memoryCache.loadedAt >= MEMORY_TTL_MS && !memoryLoad) {
+      loadMemory().catch(() => {});
+    }
     return Promise.resolve(memoryCache.snapshot);
   }
-  if (memoryLoad) return memoryLoad;
+  return memoryLoad ?? loadMemory();
+}
 
+function loadMemory(): Promise<MemorySnapshot> {
   const load = scanMemory({
     claudeDir: CLAUDE_DIR,
     projectsDir: PROJECTS_DIR,
@@ -481,7 +492,8 @@ async function watchPlansDirectory() {
 async function startServer(port: number, host?: string) {
   const server = Bun.serve({
     port,
-    hostname: host,
+    // Bun binds every interface by default; plans and memory are private
+    hostname: host ?? "127.0.0.1",
     routes: {
       "/": index,
       "/api": () => Response.redirect("/api/", 301),
@@ -575,12 +587,14 @@ async function startServer(port: number, host?: string) {
             typeof body?.filepath === "string" ? resolve(body.filepath) : null;
 
           // Only open known plan and memory files: `open`/`xdg-open` would
-          // happily launch apps or scripts, and the server may listen on 0.0.0.0
-          const [plans, memory] = await Promise.all([getPlans(), getMemory()]);
+          // happily launch apps or scripts. Plans imported with --from-file
+          // carry arbitrary filepaths, hence the .md check as well.
           const known =
-            plans.some((p) => p.filepath === filepath) ||
-            memory.entries.some((e) => e.filepath === filepath);
-          if (!filepath || !known) {
+            filepath !== null &&
+            filepath.endsWith(".md") &&
+            ((await getPlans()).some((p) => p.filepath === filepath) ||
+              (await getMemory()).entries.some((e) => e.filepath === filepath));
+          if (!known) {
             return new Response("Invalid path", { status: 400 });
           }
 

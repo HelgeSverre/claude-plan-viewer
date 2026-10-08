@@ -20,6 +20,14 @@ function isTextField(el: Element | null): boolean {
   return el?.tagName === "INPUT" || el?.tagName === "TEXTAREA";
 }
 
+// Elements where Enter has its own meaning (follow a link, press a button)
+function isInteractive(el: Element | null): boolean {
+  return (
+    isTextField(el) ||
+    el?.closest("a, button, select, summary, [role=button], [role=tab]") != null
+  );
+}
+
 // Global shortcuts. Cmd/Ctrl+K lives in SearchInput; the overlay and help
 // modal handle their own Escape/F/? keys, so those are skipped while open.
 export function useKeyboard({
@@ -63,7 +71,7 @@ export function useKeyboard({
 
       // Enter: Open in editor
       if (e.key === "Enter" && selectedId) {
-        if (!isTextField(activeEl) && activeEl?.tagName !== "BUTTON") {
+        if (!isInteractive(activeEl)) {
           e.preventDefault();
           onOpenEditor();
         }

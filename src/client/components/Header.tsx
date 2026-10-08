@@ -73,7 +73,7 @@ export function Header({
           }
           onChange={onSearchChange}
         />
-        {projects.length > 0 && (
+        {(projects.length > 0 || selectedProjects.size > 0) && (
           <ProjectFilter
             projects={projects}
             selectedProjects={selectedProjects}

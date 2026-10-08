@@ -83,7 +83,7 @@ The server will automatically find an available port if the requested port is in
 | Flag                  | Short | Description                                               |
 | --------------------- | ----- | --------------------------------------------------------- |
 | `--port <number>`     | `-p`  | Port to start the server on (default: 3000)               |
-| `--host <address>`    | `-H`  | Host to bind to (default: localhost)                      |
+| `--host <address>`    | `-H`  | Host to bind to (default: 127.0.0.1)                      |
 | `--claude-dir <path>` | `-c`  | Path to `.claude` directory (default: `~/.claude`)        |
 | `--json`              | `-j`  | Export all plans as JSON and exit                         |
 | `--output <file>`     | `-o`  | Output file for JSON export (prints to stdout if omitted) |

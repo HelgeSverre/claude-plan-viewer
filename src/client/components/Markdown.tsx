@@ -12,15 +12,24 @@ interface MarkdownProps {
   isInternalLinkResolved?: (target: string) => boolean;
 }
 
+// Malformed escapes like "100%off.md" must not throw during render
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function internalTarget(href: string | undefined): string | null {
   if (!href) return null;
   if (href.startsWith(MEMORY_LINK_SCHEME)) {
-    return decodeURIComponent(href.slice(MEMORY_LINK_SCHEME.length));
+    return safeDecode(href.slice(MEMORY_LINK_SCHEME.length));
   }
   const isUrl = /^[a-z][a-z0-9+.-]*:/i.test(href);
   if (isUrl || href.startsWith("#") || href.startsWith("/")) return null;
   const path = (href.split("#")[0] ?? "").replace(/^\.\//, "");
-  return path.toLowerCase().endsWith(".md") ? decodeURIComponent(path) : null;
+  return path.toLowerCase().endsWith(".md") ? safeDecode(path) : null;
 }
 
 export function Markdown({

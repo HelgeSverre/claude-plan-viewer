@@ -25,7 +25,7 @@ To pass CLI flags in dev mode: `bun run index.ts -- --from-file plans.json`
 
 ## Architecture
 
-**Single-file server** (`index.ts`): Entry point using `Bun.serve()` with HTML imports. Handles:
+**Server** (`index.ts`): Entry point using `Bun.serve()` with HTML imports. Handles:
 - Plan scanning from `~/.claude/plans/` directory
 - Project metadata extraction from `~/.claude/projects/` JSONL files
 - In-memory caching with file watching for live updates

@@ -3,7 +3,7 @@
 // with the autoMemoryDirectory setting.
 // See https://code.claude.com/docs/en/memory#auto-memory
 import { readdir, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
 import { homedir } from "node:os";
 
@@ -82,6 +82,16 @@ export function parseFrontmatter(content: string): {
 
   const body = content.slice(match[0].length);
   const yaml = match[1] ?? "";
+
+  // Claude Code writes flat, unquoted `key: value` lines (plus a nested
+  // `metadata:` block). Strict YAML misreads values containing " #" (a
+  // comment) or ": ", so line parsing comes first; YAML only handles block
+  // scalars and lists.
+  if (!/^\s*-\s|:\s*[|>][+-]?\s*$/m.test(yaml)) {
+    const data = parseFrontmatterLines(yaml);
+    if (data) return { data, body };
+  }
+
   try {
     const data = Bun.YAML.parse(yaml);
     const isObject =
@@ -179,30 +189,54 @@ export function countLines(content: string): number {
   return content.endsWith("\n") ? lines - 1 : lines;
 }
 
-// Claude Code names project dirs by replacing "/" and "." in the path with
-// "-", which is lossy. Rebuild the path by probing which candidates exist.
+// Directory entry names; [] for missing or unreadable paths
+export type ListDir = (path: string) => string[];
+
+function listDirSync(path: string): string[] {
+  try {
+    return readdirSync(path);
+  } catch {
+    return [];
+  }
+}
+
+function cachedListDir(listDir: ListDir): ListDir {
+  const cache = new Map<string, string[]>();
+  return (path) => {
+    let names = cache.get(path);
+    if (!names) {
+      names = listDir(path);
+      cache.set(path, names);
+    }
+    return names;
+  };
+}
+
+// Claude Code names project dirs by replacing every character outside
+// [a-zA-Z0-9] in the path with "-"
+function encodeSegment(segment: string): string {
+  return segment.replace(/[^a-zA-Z0-9]/g, "-");
+}
+
+// The encoding is lossy, so rebuild the path by matching encoded runs of the
+// name against the entries that exist at each level.
 export function decodeProjectDirName(
   name: string,
-  exists: (path: string) => boolean = existsSync,
+  listDir: ListDir = listDirSync,
 ): string | null {
   if (!name.startsWith("-")) return null;
   const parts = name.slice(1).split("-");
+  const list = cachedListDir(listDir);
 
   const walk = (path: string, i: number): string | null => {
     if (i === parts.length) return path;
+    const children = list(path || "/");
     // Longest run first: "my-app" is one segment, not "my/app"
     for (let j = parts.length; j > i; j--) {
-      const run = parts.slice(i, j);
-      const candidates = [run.join("-")];
-      // An empty part comes from a "." ("/.config" -> "--config")
-      if (run[0] === "" && run.length > 1) {
-        candidates.push("." + run.slice(1).join("-"));
-      }
-      for (const segment of candidates) {
-        if (!segment) continue;
-        const next = `${path}/${segment}`;
-        if (!exists(next)) continue;
-        const decoded = walk(next, j);
+      const target = encodeSegment(parts.slice(i, j).join("-"));
+      for (const child of children) {
+        if (encodeSegment(child) !== target) continue;
+        const decoded = walk(`${path}/${child}`, j);
         if (decoded) return decoded;
       }
     }
@@ -216,27 +250,25 @@ export function decodeProjectDirName(
 // decode the part of the path that still exists, the rest is the name.
 export function projectNameFromDirName(
   name: string,
-  exists: (path: string) => boolean = existsSync,
+  listDir: ListDir = listDirSync,
 ): string {
-  const decoded = decodeProjectDirName(name, exists);
+  const decoded = decodeProjectDirName(name, listDir);
   if (decoded) return basename(decoded);
   if (!name.startsWith("-")) return name;
 
   const parts = name.slice(1).split("-");
+  const list = cachedListDir(listDir);
   let path = "";
   let i = 0;
   advance: while (i < parts.length - 1) {
+    const children = list(path || "/");
     // Longest existing run, always leaving at least one part for the name
     for (let j = parts.length - 1; j > i; j--) {
-      const run = parts.slice(i, j);
-      const segments = [run.join("-")];
-      if (run[0] === "" && run.length > 1) {
-        segments.push("." + run.slice(1).join("-"));
-      }
-      for (const segment of segments) {
-        const next = `${path}/${segment}`;
+      const target = encodeSegment(parts.slice(i, j).join("-"));
+      for (const child of children) {
+        const next = `${path}/${child}`;
         // Memory is keyed by git root, so a project never sits inside a repo
-        if (segment && exists(next) && !exists(`${next}/.git`)) {
+        if (encodeSegment(child) === target && !list(next).includes(".git")) {
           path = next;
           i = j;
           continue advance;
@@ -267,10 +299,12 @@ export async function readCwdFromSessionLogs(
     const reader = Bun.file(join(projectDir, file)).stream().getReader();
     const decoder = new TextDecoder();
     let text = "";
+    let bytesRead = 0;
     try {
-      while (text.length < CWD_SCAN_LIMIT) {
+      while (bytesRead < CWD_SCAN_LIMIT) {
         const { done, value } = await reader.read();
         if (done) break;
+        bytesRead += value.byteLength;
         text += decoder.decode(value, { stream: true });
         const match = text.match(CWD_PATTERN);
         if (match) {
@@ -297,11 +331,17 @@ function expandHome(path: string): string | null {
   return isAbsolute(path) ? path : null;
 }
 
-// autoMemoryDirectory from one settings file; must be absolute or start with ~/
+const SETTINGS_MAX_BYTES = 1024 * 1024;
+
+// autoMemoryDirectory from one settings file; must be absolute or start with ~/.
+// Repo settings files are untrusted input: only read regular, small files
+// (not FIFOs or /dev/zero symlinks).
 export async function readAutoMemoryDirectory(
   settingsPath: string,
 ): Promise<string | null> {
   try {
+    const info = await stat(settingsPath);
+    if (!info.isFile() || info.size > SETTINGS_MAX_BYTES) return null;
     const settings = await Bun.file(settingsPath).json();
     const value = settings?.autoMemoryDirectory;
     return typeof value === "string" ? expandHome(value) : null;
@@ -325,9 +365,9 @@ async function listMarkdown(dir: string): Promise<string[]> {
 function projectName(
   cwd: string | null,
   dirName: string,
-  exists: (path: string) => boolean,
+  listDir: ListDir,
 ): string {
-  if (!cwd) return projectNameFromDirName(dirName, exists);
+  if (!cwd) return projectNameFromDirName(dirName, listDir);
   return basename(cwd.replace(/\\/g, "/").replace(/\/$/, "")) || cwd;
 }
 
@@ -342,8 +382,17 @@ function frontmatterString(
       : undefined;
   const value = nested ?? data?.[key];
   if (value instanceof Date) return value.toISOString();
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
+
+// Limits for directories that may not be real memory (autoMemoryDirectory
+// comes from settings files, including ones committed to repos)
+const MAX_FILES_PER_SOURCE = 1000;
+const MAX_FILE_BYTES = 4 * 1024 * 1024;
+const READ_CONCURRENCY = 32;
 
 type SourceMeta = Omit<
   MemorySource,
@@ -358,31 +407,35 @@ async function readSource(
   entries: MemoryEntry[];
   contents: Map<string, string>;
 }> {
-  const files = (
-    await Promise.all(
-      filenames.map(async (filename) => {
-        const filepath = join(meta.dir, filename);
-        try {
-          const [content, stats] = await Promise.all([
-            Bun.file(filepath).text(),
-            stat(filepath),
-          ]);
-          const { data, body } = parseFrontmatter(content);
-          return {
-            filename,
-            filepath,
-            content,
-            stats,
-            data,
-            body,
-            links: extractLinks(body),
-          };
-        } catch {
-          return null; // Deleted between readdir and read
-        }
-      }),
-    )
-  ).filter((f) => f !== null);
+  const readFile = async (filename: string) => {
+    const filepath = join(meta.dir, filename);
+    try {
+      const stats = await stat(filepath);
+      if (stats.size > MAX_FILE_BYTES) return null;
+      const content = await Bun.file(filepath).text();
+      const { data, body } = parseFrontmatter(content);
+      return {
+        filename,
+        filepath,
+        content,
+        stats,
+        data,
+        body,
+        links: extractLinks(body),
+      };
+    } catch {
+      return null; // Deleted between readdir and read
+    }
+  };
+
+  // Bounded concurrency: a configured directory can hold many files
+  const files: NonNullable<Awaited<ReturnType<typeof readFile>>>[] = [];
+  for (let i = 0; i < filenames.length; i += READ_CONCURRENCY) {
+    const batch = await Promise.all(
+      filenames.slice(i, i + READ_CONCURRENCY).map(readFile),
+    );
+    for (const file of batch) if (file) files.push(file);
+  }
 
   const present = new Set(files.map((f) => f.filename));
   const byName = new Map<string, string>();
@@ -492,7 +545,7 @@ export interface ScanMemoryOptions {
   projectsDir: string;
   // Working directory of a ~/.claude/projects/<dir> entry, if known
   resolveCwd: (projectDir: string) => Promise<string | null>;
-  exists?: (path: string) => boolean;
+  listDir?: ListDir;
 }
 
 function customSourceId(dir: string): string {
@@ -502,14 +555,14 @@ function customSourceId(dir: string): string {
 export async function scanMemory(
   options: ScanMemoryOptions,
 ): Promise<MemorySnapshot> {
-  const exists = options.exists ?? existsSync;
+  const listDir = options.listDir ?? listDirSync;
   const metas: { meta: SourceMeta; files: string[] }[] = [];
   const seenDirs = new Set<string>();
 
   const add = async (meta: SourceMeta) => {
     if (seenDirs.has(meta.dir)) return;
     seenDirs.add(meta.dir);
-    const files = await listMarkdown(meta.dir);
+    const files = (await listMarkdown(meta.dir)).slice(0, MAX_FILES_PER_SOURCE);
     if (files.length > 0) metas.push({ meta, files });
   };
 
@@ -540,8 +593,8 @@ export async function scanMemory(
     const projectDir = join(options.projectsDir, dirName);
     const cwd =
       (await options.resolveCwd(projectDir)) ??
-      decodeProjectDirName(dirName, exists);
-    const project = projectName(cwd, dirName, exists);
+      decodeProjectDirName(dirName, listDir);
+    const project = projectName(cwd, dirName, listDir);
 
     // Project and local settings override the user-level directory
     const repoDir = cwd
@@ -571,9 +624,12 @@ export async function scanMemory(
     }
   }
 
+  // Same-named projects stay apart: a project's custom dir follows its own
+  // default dir
   projectMetas.sort(
     (a, b) =>
       a.project.localeCompare(b.project) ||
+      (a.cwd ?? a.dir).localeCompare(b.cwd ?? b.dir) ||
       (a.kind === b.kind ? 0 : a.kind === "project" ? -1 : 1),
   );
   for (const meta of projectMetas) await add(meta);

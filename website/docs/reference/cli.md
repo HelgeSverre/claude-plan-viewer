@@ -266,7 +266,7 @@ claude-plan-viewer
 | Flag | Short | Argument | Description |
 |------|-------|----------|-------------|
 | `--port` | `-p` | `<number>` | Server port (default: 3000) |
-| `--host` | `-H` | `<address>` | Host to bind to (default: localhost) |
+| `--host` | `-H` | `<address>` | Host to bind to (default: 127.0.0.1) |
 | `--claude-dir` | `-c` | `<path>` | Claude directory path |
 | `--json` | `-j` | - | Export plans as JSON |
 | `--output` | `-o` | `<file>` | Output file for export |

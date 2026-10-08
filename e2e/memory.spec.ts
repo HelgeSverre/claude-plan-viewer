@@ -64,7 +64,7 @@ test.describe("Memory view", () => {
     await memoryRow(page, "no-presentational-tests").click();
 
     await page
-      .locator(".detail-content")
+      .locator(".detail-content .markdown")
       .getByRole("link", { name: "testing-strategy" })
       .click();
     await expect(detailTitle(page)).toHaveText("testing-strategy");
@@ -94,7 +94,7 @@ test.describe("Memory view", () => {
 
     // Index links open the topic they point to
     await page
-      .locator(".detail-content")
+      .locator(".detail-content .markdown")
       .getByRole("link", { name: "Testing strategy" })
       .click();
     await expect(detailTitle(page)).toHaveText("testing-strategy");
@@ -155,6 +155,38 @@ test.describe("Memory view", () => {
       "true",
     );
     await expect(detailTitle(page)).toHaveText("Add User Authentication");
+  });
+
+  test("a project selected in one view can be cleared from the other", async ({
+    page,
+  }) => {
+    await openMemoryView(page);
+    const filter = page.locator(".project-select-wrapper");
+    await filter.click();
+    await page.getByRole("option", { name: "cli-tool" }).click();
+    await expect(page.locator(".memory-group-row")).toHaveCount(1);
+
+    // cli-tool has memory but no plans
+    await page.getByRole("tab", { name: /Plans/ }).click();
+    await expect(page.locator(".empty-state")).toHaveText(
+      "No plans match your filters",
+    );
+
+    await filter.click();
+    await page.getByRole("option", { name: "cli-tool" }).click();
+    await expect(page.locator("#plans-table tr")).toHaveCount(3);
+  });
+
+  test("Enter on a focused link follows it", async ({ page }) => {
+    await openMemoryView(page);
+    await memoryRow(page, "no-presentational-tests").click();
+
+    await page
+      .locator(".detail-content .markdown")
+      .getByRole("link", { name: "testing-strategy" })
+      .focus();
+    await page.keyboard.press("Enter");
+    await expect(detailTitle(page)).toHaveText("testing-strategy");
   });
 
   test("keyboard switches views and moves the memory selection", async ({

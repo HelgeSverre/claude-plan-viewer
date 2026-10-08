@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { readdir, stat, watch } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { createInterface } from "node:readline";
 import index from "./src/index.html";
@@ -10,7 +10,6 @@ import pkg from "./package.json";
 import openapi from "./openapi.json";
 import getPort, { portNumbers } from "get-port";
 import {
-  decodeProjectDirName,
   readCwdFromSessionLogs,
   scanMemory,
   type MemorySnapshot,
@@ -415,16 +414,12 @@ function invalidatePlansCache() {
   plansGeneration++;
 }
 
-// Project dir path -> working directory from its session logs, or decoded
-// from the dir name when the logs are gone (null: neither worked)
+// Project dir path -> working directory from its session logs (null: none found)
 const dirCwds = new Map<string, string | null>();
 
 async function resolveProjectCwd(projectDir: string): Promise<string | null> {
   if (!dirCwds.has(projectDir)) {
-    const cwd =
-      (await readCwdFromSessionLogs(projectDir)) ??
-      decodeProjectDirName(basename(projectDir));
-    dirCwds.set(projectDir, cwd);
+    dirCwds.set(projectDir, await readCwdFromSessionLogs(projectDir));
   }
   return dirCwds.get(projectDir) ?? null;
 }

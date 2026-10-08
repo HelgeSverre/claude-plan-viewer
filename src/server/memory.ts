@@ -200,22 +200,39 @@ function listDirSync(path: string): string[] {
   }
 }
 
-function cachedListDir(listDir: ListDir): ListDir {
-  const cache = new Map<string, string[]>();
-  return (path) => {
-    let names = cache.get(path);
-    if (!names) {
-      names = listDir(path);
-      cache.set(path, names);
-    }
-    return names;
-  };
-}
-
 // Claude Code names project dirs by replacing every character outside
 // [a-zA-Z0-9] in the path with "-"
 function encodeSegment(segment: string): string {
   return segment.replace(/[^a-zA-Z0-9]/g, "-");
+}
+
+// Directory entries grouped by their encoded name. Directories like
+// /private/var/folders/.../T hold thousands of entries, so each listing is
+// read and encoded once and shared by every decode using the same ListDir.
+type EncodedIndex = (path: string) => Map<string, string[]>;
+const encodedIndexes = new WeakMap<ListDir, EncodedIndex>();
+
+function encodedIndex(listDir: ListDir): EncodedIndex {
+  // The default lister gets a fresh cache per call so results never go stale
+  const cached =
+    listDir === listDirSync ? undefined : encodedIndexes.get(listDir);
+  if (cached) return cached;
+
+  const cache = new Map<string, Map<string, string[]>>();
+  const index: EncodedIndex = (path) => {
+    let byEncoded = cache.get(path);
+    if (!byEncoded) {
+      byEncoded = new Map();
+      for (const child of listDir(path)) {
+        const key = encodeSegment(child);
+        byEncoded.set(key, [...(byEncoded.get(key) ?? []), child]);
+      }
+      cache.set(path, byEncoded);
+    }
+    return byEncoded;
+  };
+  if (listDir !== listDirSync) encodedIndexes.set(listDir, index);
+  return index;
 }
 
 // The encoding is lossy, so rebuild the path by matching encoded runs of the
@@ -226,16 +243,15 @@ export function decodeProjectDirName(
 ): string | null {
   if (!name.startsWith("-")) return null;
   const parts = name.slice(1).split("-");
-  const list = cachedListDir(listDir);
+  const index = encodedIndex(listDir);
 
   const walk = (path: string, i: number): string | null => {
     if (i === parts.length) return path;
-    const children = list(path || "/");
+    const children = index(path || "/");
     // Longest run first: "my-app" is one segment, not "my/app"
     for (let j = parts.length; j > i; j--) {
       const target = encodeSegment(parts.slice(i, j).join("-"));
-      for (const child of children) {
-        if (encodeSegment(child) !== target) continue;
+      for (const child of children.get(target) ?? []) {
         const decoded = walk(`${path}/${child}`, j);
         if (decoded) return decoded;
       }
@@ -257,18 +273,18 @@ export function projectNameFromDirName(
   if (!name.startsWith("-")) return name;
 
   const parts = name.slice(1).split("-");
-  const list = cachedListDir(listDir);
+  const index = encodedIndex(listDir);
   let path = "";
   let i = 0;
   advance: while (i < parts.length - 1) {
-    const children = list(path || "/");
+    const children = index(path || "/");
     // Longest existing run, always leaving at least one part for the name
     for (let j = parts.length - 1; j > i; j--) {
       const target = encodeSegment(parts.slice(i, j).join("-"));
-      for (const child of children) {
+      for (const child of children.get(target) ?? []) {
         const next = `${path}/${child}`;
         // Memory is keyed by git root, so a project never sits inside a repo
-        if (encodeSegment(child) === target && !list(next).includes(".git")) {
+        if (!index(next).has(encodeSegment(".git"))) {
           path = next;
           i = j;
           continue advance;
@@ -555,7 +571,8 @@ function customSourceId(dir: string): string {
 export async function scanMemory(
   options: ScanMemoryOptions,
 ): Promise<MemorySnapshot> {
-  const listDir = options.listDir ?? listDirSync;
+  // A fresh lister per scan, so its directory cache lives for this scan only
+  const listDir: ListDir = options.listDir ?? ((path) => listDirSync(path));
   const metas: { meta: SourceMeta; files: string[] }[] = [];
   const seenDirs = new Set<string>();
 
@@ -591,9 +608,14 @@ export async function scanMemory(
   const projectMetas: SourceMeta[] = [];
   for (const dirName of projectDirs) {
     const projectDir = join(options.projectsDir, dirName);
-    const cwd =
-      (await options.resolveCwd(projectDir)) ??
-      decodeProjectDirName(dirName, listDir);
+    const hasMemory =
+      (await listMarkdown(join(projectDir, "memory"))).length > 0;
+
+    // Decoding the dir name is a fallback for memory whose session logs were
+    // cleaned up; without memory or logs there's nothing to show
+    let cwd = await options.resolveCwd(projectDir);
+    if (!cwd && hasMemory) cwd = decodeProjectDirName(dirName, listDir);
+    if (!cwd && !hasMemory) continue;
     const project = projectName(cwd, dirName, listDir);
 
     // Project and local settings override the user-level directory

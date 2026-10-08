@@ -7,6 +7,7 @@ Claude Plan Viewer is an open-source tool that provides a React frontend with a 
 ## Key Features
 
 - Browse and search all Claude Code plans from `~/.claude/plans/`
+- Browse per-project auto memory from `~/.claude/projects/*/memory/` (MEMORY.md load budget, wikilinks, backlinks)
 - Sort by title, project, modified date, or size
 - Full markdown rendering with syntax highlighting
 - Keyboard navigation (arrow keys, Cmd+K for search)
@@ -19,6 +20,7 @@ Claude Plan Viewer is an open-source tool that provides a React frontend with a 
 
 - [Quick Start](/introduction/quickstart): Get started in under a minute
 - [Installation](/introduction/installation): All installation methods
+- [Project Memory](/guides/memory): Browse Claude Code's auto memory
 - [CLI Reference](/reference/cli): Command-line options and flags
 - [REST API](/reference/api): API endpoints documentation
 - [API Playground](/reference/api-playground): Interactive API explorer

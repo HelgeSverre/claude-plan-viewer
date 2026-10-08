@@ -158,6 +158,101 @@ curl "http://localhost:3000/api/search?q=jwt"
 
 ---
 
+## List Memory
+
+**GET** `/api/memory`
+
+Returns Claude Code's auto memory: one source per memory directory and one entry per file, without content. Sources come from `~/.claude/projects/*/memory/` and any `autoMemoryDirectory` setting. Results are cached for 5 seconds; `POST /api/refresh` clears the cache.
+
+### Response
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sources` | `MemorySource[]` | Memory directories, sorted by project name |
+| `entries` | `MemoryEntry[]` | Files in those directories, including each `MEMORY.md` |
+
+**MemorySource**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Project directory name, or `custom-<hash>` for an `autoMemoryDirectory` |
+| `kind` | `"project" \| "custom"` | Default project directory or `autoMemoryDirectory` |
+| `project` | `string` | Project name from the session cwd; `All projects` for a user-level `autoMemoryDirectory` |
+| `cwd` | `string \| null` | Working directory of the project |
+| `dir` | `string` | Absolute path of the memory directory |
+| `active` | `boolean` | `false` when an `autoMemoryDirectory` setting means Claude Code no longer reads it |
+| `index` | `object \| null` | `MEMORY.md` stats: `lines`, `bytes`, `lineLimit` (200), `byteLimit` (25000), `danglingLinks` |
+| `orphans` | `string[]` | Topic files `MEMORY.md` doesn't link to |
+| `entryCount` | `number` | Topic files, excluding `MEMORY.md` |
+| `modified` | `string` | Latest modification of any entry (ISO 8601) |
+
+**MemoryEntry**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | `<sourceId>/<filename>` |
+| `sourceId` | `string` | Source this entry belongs to |
+| `filename` / `filepath` | `string` | File name and absolute path |
+| `isIndex` | `boolean` | `true` for `MEMORY.md` |
+| `name` | `string` | Frontmatter `name`, else the first heading, else the filename |
+| `description` | `string \| null` | Frontmatter `description` |
+| `type` | `string \| null` | `user`, `feedback`, `project`, or `reference` |
+| `sessionId` | `string \| null` | Frontmatter `originSessionId` |
+| `modified` | `string` | Frontmatter `modified`, else the file's modification time |
+| `size` / `lineCount` | `number` | File size in bytes and line count |
+| `links` / `linkedFrom` | `string[]` | Filenames this entry links to, and that link to it (markdown links and `[[wikilinks]]`) |
+| `inIndex` | `boolean` | Linked from `MEMORY.md` |
+
+### Example Request
+
+```bash
+curl http://localhost:3000/api/memory
+```
+
+---
+
+## Get Memory Content
+
+**GET** `/api/memory/content?id={id}`
+
+Returns the raw markdown of one memory entry, including frontmatter.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | `string` | Yes | Entry `id` from `/api/memory` |
+
+```bash
+curl "http://localhost:3000/api/memory/content?id=-Users-dev-code-web-app%2FMEMORY.md"
+```
+
+```json
+{
+  "content": "- [Testing strategy](testing-strategy.md) — fixtures over live data\n"
+}
+```
+
+Returns `404` with `Memory not found` for unknown ids.
+
+---
+
+## Search Memory Content
+
+**GET** `/api/memory/search?q={query}`
+
+Returns the ids of memory entries whose content contains the query (case-insensitive).
+
+```bash
+curl "http://localhost:3000/api/memory/search?q=release"
+```
+
+```json
+{
+  "ids": ["-Users-dev-code-web-app/release-checklist.md"]
+}
+```
+
+---
+
 ## List Projects
 
 **GET** `/api/projects`
@@ -237,13 +332,13 @@ curl -X POST http://localhost:3000/api/refresh
 
 **POST** `/api/open`
 
-Opens the specified plan file in the system's default editor. This uses the operating system's default application for `.md` files.
+Opens the specified plan or memory file in the system's default editor. This uses the operating system's default application for `.md` files.
 
 ### Request Body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `filepath` | `string` | Yes | `filepath` of a plan as returned by `/api/plans`; any other path is rejected |
+| `filepath` | `string` | Yes | `filepath` of a plan from `/api/plans` or a memory entry from `/api/memory`; any other path is rejected |
 
 ### Example Request
 
@@ -321,6 +416,7 @@ Error responses return plain text messages:
 | Endpoint | Status | Message |
 |----------|--------|---------|
 | `/api/plans/{filename}/content` | 404 | `Plan not found` |
+| `/api/memory/content` | 404 | `Memory not found` |
 | `/api/open` | 400 | `Invalid path` |
 | `/api/open` | 500 | `Failed to open file` |
 

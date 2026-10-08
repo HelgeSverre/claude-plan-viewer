@@ -16,20 +16,21 @@ Over time, you accumulate many plan files. Claude Plan Viewer makes it easy to b
 ## What This Tool Does
 
 - **Browse** all your plan files in a clean, searchable table
-- **Search** by title, filename, or project name
+- **Search** by title, filename, project name, or content
 - **Filter** by project to focus on specific work
 - **Sort** by title, project, size, line count, modified date, or created date
 - **View** rendered markdown with syntax highlighting
 - **Export** plans to JSON via CLI for backup or sharing
 - **Open** plans in your default editor with one click
-- **Keyboard navigation** — use arrow keys, `j`/`k`, `Cmd+K` to search, `?` for help
+- **Browse project memory** — the notes Claude Code's [auto memory](/guides/memory) saves per project
+- **Keyboard navigation** — use arrow keys, `1`/`2` to switch views, `Cmd+K` to search, `?` for help
 
 ## What This Tool Does NOT Do
 
 Claude Plan Viewer is read-only. It does not:
 
 - Create new plans (use Claude Code for that)
-- Edit or modify existing plans
+- Edit or modify existing plans or memory
 - Sync plans across machines (you can export JSON and view it on another machine with `--from-file`)
 - Connect to Claude's API
 

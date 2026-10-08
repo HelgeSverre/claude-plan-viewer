@@ -13,10 +13,11 @@
 
 ## Features
 
-- Browse and search all your Claude Code plans
+- Browse and search all your Claude Code plans, including their content
+- Browse each project's [auto memory](https://code.claude.com/docs/en/memory#auto-memory): `MEMORY.md` load budget, topic files, wikilinks, and links back to plans
 - Sort by title, project, modified date, or size
 - Full markdown rendering with syntax highlighting
-- Keyboard navigation (arrow keys, Cmd+K for search)
+- Keyboard navigation (arrow keys, 1/2 to switch views, Cmd+K for search)
 - Dark theme UI
 
 ## Installation
@@ -137,9 +138,12 @@ The viewer exposes a REST API for programmatic access:
 | `/api/plans`                    | GET    | List all plans (metadata)  |
 | `/api/plans/{filename}/content` | GET    | Get plan markdown content  |
 | `/api/search?q=`                | GET    | Search plan content        |
+| `/api/memory`                   | GET    | List auto memory (metadata) |
+| `/api/memory/content?id=`       | GET    | Get memory markdown content |
+| `/api/memory/search?q=`         | GET    | Search memory content       |
 | `/api/projects`                 | GET    | List all project names     |
 | `/api/refresh`                  | POST   | Force cache refresh        |
-| `/api/open`                     | POST   | Open plan in system editor |
+| `/api/open`                     | POST   | Open plan or memory in editor |
 | `/api/openapi.json`             | GET    | OpenAPI 3.0 specification  |
 
 ## Development

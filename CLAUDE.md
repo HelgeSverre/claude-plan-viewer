@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Claude Plan Viewer is a web-based viewer for Claude Code plan files (`~/.claude/plans/*.md`). It provides a React frontend with a Bun-powered backend that serves plan metadata and content via REST API.
+Claude Plan Viewer is a web-based viewer for Claude Code plan files (`~/.claude/plans/*.md`) and per-project auto memory (`~/.claude/projects/*/memory/*.md`). It provides a React frontend with a Bun-powered backend that serves plan metadata and content via REST API.
 
 **Website:** https://claudeplans.dev
 
@@ -31,10 +31,14 @@ To pass CLI flags in dev mode: `bun run index.ts -- --from-file plans.json`
 - In-memory caching with file watching for live updates
 - REST API endpoints
 
+**Memory scanner** (`src/server/memory.ts`): pure, unit-tested module that reads memory dirs (plus `autoMemoryDirectory` settings), parses frontmatter, resolves links/backlinks, and computes the MEMORY.md load budget. `index.ts` caches its snapshot for 5s.
+
 **React SPA** (`src/client/`): Client-side rendered app bundled automatically by Bun's HTML imports.
 - `App.tsx` - Main component, state management, keyboard shortcuts
 - `hooks/usePlans.ts` - SWR-based data fetching with client-side filtering/sorting
 - `hooks/usePlanContent.ts` - SWR content fetch keyed on filename + modified
+- `hooks/useMemory.ts` / `useMemoryContent.ts` - memory list (grouped, filtered) and content
+- `App.tsx` switches between the Plans and Memory views (`?view=memory`)
 - `hooks/useFilters.ts` - URL-synced filter state (search, sort, projects)
 - `components/` - UI components (PlansTable, DetailPanel, Markdown, etc.)
 
@@ -50,9 +54,12 @@ To pass CLI flags in dev mode: `bun run index.ts -- --from-file plans.json`
 | `/api/plans` | GET | List all plans (metadata only) |
 | `/api/plans/{filename}/content` | GET | Get plan markdown content |
 | `/api/search?q=` | GET | Filenames of plans whose content matches |
+| `/api/memory` | GET | Memory sources and entries (metadata only) |
+| `/api/memory/content?id=` | GET | Raw memory markdown |
+| `/api/memory/search?q=` | GET | Ids of memory entries whose content matches |
 | `/api/projects` | GET | List unique project names |
 | `/api/refresh` | POST | Force cache refresh |
-| `/api/open` | POST | Open plan in system editor |
+| `/api/open` | POST | Open a known plan or memory file in system editor |
 | `/api/openapi.json` | GET | OpenAPI 3.0 specification |
 
 ## Key Patterns

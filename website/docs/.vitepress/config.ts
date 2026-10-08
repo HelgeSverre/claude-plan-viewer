@@ -46,6 +46,7 @@ export default defineConfig({
       {
         text: "Usage",
         items: [
+          { text: "Project Memory", link: "/guides/memory" },
           { text: "Load from JSON", link: "/guides/load-from-json" },
           { text: "Custom Directory", link: "/guides/custom-directory" },
           { text: "JSON Export", link: "/guides/json-export" },

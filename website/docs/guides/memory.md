@@ -9,6 +9,8 @@ Claude Code's [auto memory](https://code.claude.com/docs/en/memory#auto-memory) 
 
 Switch views with the **Plans / Memory** tabs in the header, or press `1` and `2`.
 
+![The Memory view: memories grouped by project, with a topic memory open](/memory-view.png)
+
 ## Where memory comes from
 
 | Location | When it's shown |

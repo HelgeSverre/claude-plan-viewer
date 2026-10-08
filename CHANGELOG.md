@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.6.0] - 2026-10-08
+
+### Added
+
+- Memory view for Claude Code's per-project [auto memory](https://code.claude.com/docs/en/memory#auto-memory) ([#2](https://github.com/HelgeSverre/claude-plan-viewer/issues/2))
+  - Reads `~/.claude/projects/*/memory/` and `autoMemoryDirectory` settings (user, project and local)
+  - Memories grouped by project, with type badges, type filters and content search
+  - `MEMORY.md` load budget (200 lines / 25 KB), topic files missing from the index, and dangling index links
+  - Clickable `[[wikilinks]]` and `.md` links, backlinks, and links between plans and the memories written in the same session
+  - Switch views with the header tabs or `1` / `2`
+- `GET /api/memory`, `/api/memory/content` and `/api/memory/search`
+- Full-text search across plan content (`GET /api/search`)
+- Search, sort, project and type filters, view and selection persist in the URL
+- `typecheck` script
+
+### Changed
+
+- The server binds `127.0.0.1` unless `--host` is given; before, Bun listened on every network interface
+- Bumped all dependencies; TypeScript 7 moved from `peerDependencies` to `devDependencies`
+- Requires Bun 1.2.21 or later
+- API and e2e tests run against `test/fixtures` instead of the real `~/.claude`
+
+### Fixed
+
+- `/api/open` accepted paths outside the plans directory (`../` traversal and sibling directories); it now only opens known plan and memory files
+- Plan titles containing markup such as `<Button>` were rendered as HTML
+- Search only matched the content of plans that had already been opened
+- Startup crashed when `~/.claude/plans` didn't exist
+- Plans created while the server was running never got a project or session
+- Concurrent requests at startup scanned the session logs several times
+- Refresh with `--from-file` reloaded plans from disk instead of the file
+- Refresh skipped reloading when the plan count was unchanged, leaving stale content
+- Fast keyboard navigation could show the previous plan's content
+- Arrow keys in the project filter also moved the plan selection
+- Code blocks under react-markdown v10; external links in plans now open in a new tab
+
 ## [1.5.0] - 2026-02-18
 
 ### Changed

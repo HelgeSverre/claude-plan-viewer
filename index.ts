@@ -1,14 +1,18 @@
 #!/usr/bin/env bun
 import { readdir, stat, watch } from "node:fs/promises";
-import { createReadStream } from "node:fs";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
-import { createInterface } from "node:readline";
 import index from "./src/index.html";
 import apiDocs from "./src/api-docs.html";
 import pkg from "./package.json";
 import openapi from "./openapi.json";
 import getPort, { portNumbers } from "get-port";
+import {
+  extractProjectName,
+  matchCwd,
+  matchSlugSession,
+  processJsonlLineByLine,
+} from "./src/server/projects.ts";
 import {
   readCwdFromSessionLogs,
   scanMemory,
@@ -189,45 +193,6 @@ interface PlanMetadata {
   sessionId: string | null;
 }
 
-// Extract project name from a full path (cross-platform)
-// e.g., "/Users/helge/code/plans-viewer" -> "plans-viewer"
-// e.g., "C:\Users\name\code\my-app" -> "my-app"
-function extractProjectName(cwd: string): string {
-  if (!cwd) return "";
-  // Normalize: handle both / and \ separators
-  const normalized = cwd.replace(/\\/g, "/");
-  // Remove trailing slash
-  const trimmed = normalized.endsWith("/")
-    ? normalized.slice(0, -1)
-    : normalized;
-  // Get last segment
-  const lastSlash = trimmed.lastIndexOf("/");
-  return lastSlash === -1 ? trimmed : trimmed.slice(lastSlash + 1);
-}
-
-// Stream a JSONL file line-by-line without loading the entire file into memory
-async function processJsonlLineByLine(
-  path: string,
-  onLine: (line: string) => void,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const stream = createReadStream(path, {
-      encoding: "utf-8",
-      highWaterMark: 64 * 1024,
-    });
-    const rl = createInterface({ input: stream, crlfDelay: Infinity });
-
-    rl.on("line", (line) => {
-      if (line.length > 0) onLine(line);
-    });
-    rl.on("close", resolve);
-    rl.on("error", (err) => {
-      rl.close();
-      reject(err);
-    });
-  });
-}
-
 interface SlugMetadata {
   project: string;
   sessionId: string | null;
@@ -245,20 +210,16 @@ async function scanJsonl(dir: string, filePath: string): Promise<void> {
 
   await processJsonlLineByLine(filePath, (line) => {
     if (!dirProjectNames.has(dir)) {
-      const cwdMatch = line.match(/"cwd":"([^"]+)"/);
-      if (cwdMatch?.[1]) {
-        const cwd = cwdMatch[1].replace(/\\\\/g, "\\");
+      const cwd = matchCwd(line);
+      if (cwd) {
         dirProjectNames.set(dir, extractProjectName(cwd));
         dirCwds.set(join(PROJECTS_DIR, dir), cwd);
       }
     }
 
-    const slugMatch = line.match(/"slug":"([\w-]+)"/);
-    if (slugMatch?.[1]) {
-      const sessionMatch = line.match(/"sessionId":"([^"]+)"/);
-      if (sessionMatch?.[1]) {
-        slugSessions.set(slugMatch[1], sessionMatch[1]);
-      }
+    const match = matchSlugSession(line);
+    if (match) {
+      slugSessions.set(match.slug, match.sessionId);
     }
   });
 

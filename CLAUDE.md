@@ -31,6 +31,8 @@ To pass CLI flags in dev mode: `bun run index.ts -- --from-file plans.json`
 - In-memory caching with file watching for live updates
 - REST API endpoints
 
+**Session log helpers** (`src/server/projects.ts`): `extractProjectName`, cwd/slug/session matchers and the streaming JSONL reader, shared by plan mapping and the memory scanner.
+
 **Memory scanner** (`src/server/memory.ts`): pure, unit-tested module that reads memory dirs (plus `autoMemoryDirectory` settings), parses frontmatter, resolves links/backlinks, and computes the MEMORY.md load budget. `index.ts` caches its snapshot for 5s.
 
 **React SPA** (`src/client/`): Client-side rendered app bundled automatically by Bun's HTML imports.

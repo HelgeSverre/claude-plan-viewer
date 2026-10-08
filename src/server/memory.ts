@@ -6,6 +6,7 @@ import { readdir, stat } from "node:fs/promises";
 import { readdirSync } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
 import { homedir } from "node:os";
+import { extractProjectName, matchCwd } from "./projects.ts";
 
 export const MEMORY_INDEX = "MEMORY.md";
 // Claude Code loads the first 200 lines or 25KB of MEMORY.md at session
@@ -296,7 +297,6 @@ export function projectNameFromDirName(
   return parts.slice(i).join("-").replace(/^-+/, "") || name;
 }
 
-const CWD_PATTERN = /"cwd":"((?:[^"\\]|\\.)*)"/;
 const CWD_SCAN_LIMIT = 4 * 1024 * 1024;
 
 // First "cwd" recorded in a project dir's session logs. Streams each log and
@@ -322,14 +322,8 @@ export async function readCwdFromSessionLogs(
         if (done) break;
         bytesRead += value.byteLength;
         text += decoder.decode(value, { stream: true });
-        const match = text.match(CWD_PATTERN);
-        if (match) {
-          try {
-            return JSON.parse(`"${match[1]}"`) as string;
-          } catch {
-            return match[1] ?? null;
-          }
-        }
+        const cwd = matchCwd(text);
+        if (cwd) return cwd;
         // Keep a tail so a match split across chunks is still found
         if (text.length > 64 * 1024) text = text.slice(-4096);
       }
@@ -384,7 +378,8 @@ function projectName(
   listDir: ListDir,
 ): string {
   if (!cwd) return projectNameFromDirName(dirName, listDir);
-  return basename(cwd.replace(/\\/g, "/").replace(/\/$/, "")) || cwd;
+  // Same naming as plans, so a plan's project matches its memory
+  return extractProjectName(cwd) || cwd;
 }
 
 function frontmatterString(

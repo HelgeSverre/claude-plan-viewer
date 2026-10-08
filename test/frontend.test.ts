@@ -1,288 +1,105 @@
-import { test, expect, mock, beforeEach, afterEach } from "bun:test";
+import { test, expect, describe } from "bun:test";
+import {
+  escapeRegex,
+  pluralize,
+  abbreviateHome,
+} from "../src/client/utils/strings.ts";
+import {
+  linkifyWikilinks,
+  stripFrontmatter,
+} from "../src/client/utils/markdown.ts";
+import { formatDate, formatSize } from "../src/client/utils/formatters.ts";
 
-// Test the debounce utility
-test("debounce delays function execution", async () => {
-  let callCount = 0;
-  const fn = () => {
-    callCount++;
-  };
-
-  // Inline debounce for testing (same implementation as frontend.ts)
-  function debounce<T extends (...args: unknown[]) => void>(
-    fn: T,
-    ms: number,
-  ): T {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    return ((...args: unknown[]) => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => fn(...args), ms);
-    }) as T;
-  }
-
-  const debouncedFn = debounce(fn, 100);
-
-  // Call multiple times rapidly
-  debouncedFn();
-  debouncedFn();
-  debouncedFn();
-
-  // Should not have been called yet
-  expect(callCount).toBe(0);
-
-  // Wait for debounce to complete
-  await new Promise((resolve) => setTimeout(resolve, 150));
-
-  // Should have been called exactly once
-  expect(callCount).toBe(1);
+describe("escapeRegex", () => {
+  test("escapes every regex metacharacter", () => {
+    const input = "a.b*c+d?e^f$g{h}i(j)k|l[m]n\\o";
+    expect(new RegExp(escapeRegex(input)).test(input)).toBe(true);
+    expect(new RegExp(`^${escapeRegex("(x)")}$`).test("(x)")).toBe(true);
+  });
 });
 
-test("debounce resets timer on subsequent calls", async () => {
-  const calls: number[] = [];
-  const fn = () => {
-    calls.push(Date.now());
-  };
-
-  function debounce<T extends (...args: unknown[]) => void>(
-    fn: T,
-    ms: number,
-  ): T {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    return ((...args: unknown[]) => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => fn(...args), ms);
-    }) as T;
-  }
-
-  const debouncedFn = debounce(fn, 100);
-
-  const start = Date.now();
-  debouncedFn();
-
-  // Call again after 50ms - should reset the timer
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  debouncedFn();
-
-  // Wait for debounce
-  await new Promise((resolve) => setTimeout(resolve, 150));
-
-  // Should have been called once, approximately 150ms after start
-  expect(calls.length).toBe(1);
-  const elapsed = calls[0]! - start;
-  expect(elapsed).toBeGreaterThanOrEqual(140); // Allow some timing variance
+describe("pluralize", () => {
+  test("uses the singular only for one", () => {
+    expect(pluralize(0, "plan")).toBe("0 plans");
+    expect(pluralize(1, "plan")).toBe("1 plan");
+    expect(pluralize(1, "memory")).toBe("1 memory");
+    expect(pluralize(4, "memory")).toBe("4 memories");
+  });
 });
 
-// Test URL query param handling
-test("updateSearchQueryParam sets q param for non-empty query", () => {
-  // Mock window.location and history
-  const mockUrl = new URL("http://localhost:3000/");
-  const replacedStates: string[] = [];
+describe("abbreviateHome", () => {
+  test("shortens macOS and Linux home directories", () => {
+    expect(abbreviateHome("/Users/helge/code/app")).toBe("~/code/app");
+    expect(abbreviateHome("/home/dev/app")).toBe("~/app");
+    expect(abbreviateHome("/Users/helge")).toBe("~");
+  });
 
-  const originalLocation = globalThis.window?.location;
-  const originalHistory = globalThis.history;
-
-  // @ts-expect-error - mocking global
-  globalThis.window = { location: { href: mockUrl.toString() } };
-  // @ts-expect-error - mocking global
-  globalThis.history = {
-    replaceState: (_: unknown, __: string, url: string) => {
-      replacedStates.push(url);
-    },
-  };
-
-  function updateSearchQueryParam(query: string): void {
-    const url = new URL(window.location.href);
-    if (query) {
-      url.searchParams.set("q", query);
-    } else {
-      url.searchParams.delete("q");
-    }
-    history.replaceState(null, "", url.toString());
-  }
-
-  updateSearchQueryParam("test query");
-
-  expect(replacedStates.length).toBe(1);
-  expect(replacedStates[0]).toContain("q=test+query");
-
-  // Cleanup
-  if (originalLocation) {
-    // @ts-ignore - restoring global
-    globalThis.window = { location: originalLocation };
-  }
-  if (originalHistory) {
-    // @ts-ignore - restoring global
-    globalThis.history = originalHistory;
-  }
+  test("leaves other paths alone", () => {
+    expect(abbreviateHome("/private/tmp/x")).toBe("/private/tmp/x");
+    expect(abbreviateHome("/Users-like/x")).toBe("/Users-like/x");
+  });
 });
 
-test("updateSearchQueryParam removes q param for empty query", () => {
-  const mockUrl = new URL("http://localhost:3000/?q=existing");
-  const replacedStates: string[] = [];
+describe("stripFrontmatter", () => {
+  test("removes a leading frontmatter block", () => {
+    expect(stripFrontmatter("---\nname: x\ntype: user\n---\nBody")).toBe(
+      "Body",
+    );
+    expect(stripFrontmatter("---\r\nname: x\r\n---\r\nBody")).toBe("Body");
+  });
 
-  // @ts-expect-error - mocking global
-  globalThis.window = { location: { href: mockUrl.toString() } };
-  // @ts-expect-error - mocking global
-  globalThis.history = {
-    replaceState: (_: unknown, __: string, url: string) => {
-      replacedStates.push(url);
-    },
-  };
-
-  function updateSearchQueryParam(query: string): void {
-    const url = new URL(window.location.href);
-    if (query) {
-      url.searchParams.set("q", query);
-    } else {
-      url.searchParams.delete("q");
-    }
-    history.replaceState(null, "", url.toString());
-  }
-
-  updateSearchQueryParam("");
-
-  expect(replacedStates.length).toBe(1);
-  expect(replacedStates[0]).not.toContain("q=");
+  test("keeps content without frontmatter, including later rules", () => {
+    expect(stripFrontmatter("# Title\n\n---\n\nText")).toBe(
+      "# Title\n\n---\n\nText",
+    );
+  });
 });
 
-test("search query is loaded from URL on init", () => {
-  const mockUrl = new URL("http://localhost:3000/?q=loaded");
+describe("linkifyWikilinks", () => {
+  test("rewrites wikilinks as memory: links", () => {
+    expect(linkifyWikilinks("See [[testing-strategy]].")).toBe(
+      "See [testing-strategy](memory:testing-strategy).",
+    );
+  });
 
-  // Simulate extracting query from URL like init() does
-  const queryParam = mockUrl.searchParams.get("q");
+  test("uses the alias as text and drops heading anchors", () => {
+    expect(linkifyWikilinks("[[notes|My notes]] and [[deploy#Steps]]")).toBe(
+      "[My notes](memory:notes) and [deploy](memory:deploy)",
+    );
+  });
 
-  expect(queryParam).toBe("loaded");
+  test("encodes targets for use in a URL", () => {
+    expect(linkifyWikilinks("[[two words]]")).toBe(
+      "[two words](memory:two%20words)",
+    );
+  });
+
+  test("leaves fenced and inline code untouched", () => {
+    const md = "```md\n[[fenced]]\n```\nUse `[[inline]]` or [[real]]";
+    expect(linkifyWikilinks(md)).toBe(
+      "```md\n[[fenced]]\n```\nUse `[[inline]]` or [real](memory:real)",
+    );
+  });
 });
 
-test("search query preserves special characters in URL", () => {
-  const replacedStates: string[] = [];
-  const mockUrl = new URL("http://localhost:3000/");
-
-  // @ts-expect-error - mocking global
-  globalThis.window = { location: { href: mockUrl.toString() } };
-  // @ts-expect-error - mocking global
-  globalThis.history = {
-    replaceState: (_: unknown, __: string, url: string) => {
-      replacedStates.push(url);
-    },
-  };
-
-  function updateSearchQueryParam(query: string): void {
-    const url = new URL(window.location.href);
-    if (query) {
-      url.searchParams.set("q", query);
-    } else {
-      url.searchParams.delete("q");
-    }
-    history.replaceState(null, "", url.toString());
-  }
-
-  updateSearchQueryParam("test & query");
-
-  expect(replacedStates.length).toBe(1);
-  // URL should properly encode the ampersand
-  const parsedUrl = new URL(replacedStates[0]!);
-  expect(parsedUrl.searchParams.get("q")).toBe("test & query");
+describe("formatSize", () => {
+  test("formats bytes and kilobytes", () => {
+    expect(formatSize(512)).toBe("512 B");
+    expect(formatSize(2048)).toBe("2.0 KB");
+  });
 });
 
-// Test plan URL query param handling
-test("updatePlanQueryParam sets plan param when plan is selected", () => {
-  const replacedStates: string[] = [];
-  const mockUrl = new URL("http://localhost:3000/");
+describe("formatDate", () => {
+  const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
-  // @ts-expect-error - mocking global
-  globalThis.window = { location: { href: mockUrl.toString() } };
-  // @ts-expect-error - mocking global
-  globalThis.history = {
-    replaceState: (_: unknown, __: string, url: string) => {
-      replacedStates.push(url);
-    },
-  };
+  test("shows relative times for the last week", () => {
+    expect(formatDate(ago(10_000))).toBe("just now");
+    expect(formatDate(ago(5 * 60_000))).toBe("5m ago");
+    expect(formatDate(ago(3 * 3_600_000))).toBe("3h ago");
+    expect(formatDate(ago(2 * 86_400_000))).toBe("2d ago");
+  });
 
-  // Simulate the logic from handleSelectPlan
-  function updatePlanQueryParam(planFilename: string | null): void {
-    const url = new URL(window.location.href);
-    if (planFilename) {
-      url.searchParams.set("plan", planFilename);
-    } else {
-      url.searchParams.delete("plan");
-    }
-    history.replaceState({}, "", url.toString());
-  }
-
-  updatePlanQueryParam("giggly-sparking-pizza.md");
-
-  expect(replacedStates.length).toBe(1);
-  expect(replacedStates[0]).toContain("plan=giggly-sparking-pizza.md");
-});
-
-test("updatePlanQueryParam removes plan param when plan is null", () => {
-  const replacedStates: string[] = [];
-  const mockUrl = new URL("http://localhost:3000/?plan=existing-plan.md");
-
-  // @ts-expect-error - mocking global
-  globalThis.window = { location: { href: mockUrl.toString() } };
-  // @ts-expect-error - mocking global
-  globalThis.history = {
-    replaceState: (_: unknown, __: string, url: string) => {
-      replacedStates.push(url);
-    },
-  };
-
-  function updatePlanQueryParam(planFilename: string | null): void {
-    const url = new URL(window.location.href);
-    if (planFilename) {
-      url.searchParams.set("plan", planFilename);
-    } else {
-      url.searchParams.delete("plan");
-    }
-    history.replaceState({}, "", url.toString());
-  }
-
-  updatePlanQueryParam(null);
-
-  expect(replacedStates.length).toBe(1);
-  expect(replacedStates[0]).not.toContain("plan=");
-});
-
-test("plan filename is loaded from URL on init", () => {
-  const mockUrl = new URL(
-    "http://localhost:3000/?plan=goofy-swinging-rainbow.md",
-  );
-
-  // Simulate extracting plan from URL like the useEffect does
-  const planParam = mockUrl.searchParams.get("plan");
-
-  expect(planParam).toBe("goofy-swinging-rainbow.md");
-});
-
-test("plan param coexists with search query param", () => {
-  const replacedStates: string[] = [];
-  const mockUrl = new URL("http://localhost:3000/?q=search-term");
-
-  // @ts-expect-error - mocking global
-  globalThis.window = { location: { href: mockUrl.toString() } };
-  // @ts-expect-error - mocking global
-  globalThis.history = {
-    replaceState: (_: unknown, __: string, url: string) => {
-      replacedStates.push(url);
-    },
-  };
-
-  function updatePlanQueryParam(planFilename: string | null): void {
-    const url = new URL(window.location.href);
-    if (planFilename) {
-      url.searchParams.set("plan", planFilename);
-    } else {
-      url.searchParams.delete("plan");
-    }
-    history.replaceState({}, "", url.toString());
-  }
-
-  updatePlanQueryParam("test-plan.md");
-
-  expect(replacedStates.length).toBe(1);
-  const parsedUrl = new URL(replacedStates[0]!);
-  // Both params should be present
-  expect(parsedUrl.searchParams.get("plan")).toBe("test-plan.md");
-  expect(parsedUrl.searchParams.get("q")).toBe("search-term");
+  test("shows the year for dates in other years", () => {
+    expect(formatDate("2020-03-15T12:00:00.000Z")).toBe("Mar 15, 2020");
+  });
 });
